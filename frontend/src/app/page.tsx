@@ -17,7 +17,7 @@ export default function Home() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Dữ liệu động (Content Marketing - High Conversion Style)
+  // Dữ liệu động (So sánh Truyền thống vs FreeCast)
   const content = {
     brand: {
       painPoints: [
@@ -357,7 +357,6 @@ export default function Home() {
                     <item.icon size={28} />
                   </div>
                   <h3 className="text-xl font-bold mb-4 relative z-10">{item.title}</h3>
-                  <p className="text-sm text-slate-400 leading-relaxed relative z-10 mb-4">{item.desc}</p>
                   
                   {/* Comparison Block */}
                   {item.traditional && (
@@ -401,7 +400,6 @@ export default function Home() {
                     <feature.icon />
                   </div>
                   <h3 className="text-xl font-bold mb-4">{feature.title}</h3>
-                  <p className="text-slate-400 text-sm leading-relaxed mb-6">{feature.desc}</p>
                   
                   {/* Comparison Block */}
                   {feature.traditional && (
