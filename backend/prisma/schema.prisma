@@ -1,0 +1,115 @@
+// 1. Cấu hình kết nối
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 2. Định nghĩa các Enum (Danh sách cố định)
+enum Role {
+  ADMIN
+  BRAND
+  KOL
+}
+
+enum CampaignStatus {
+  DRAFT     // Nháp
+  ACTIVE    // Đang chạy
+  PAUSED    // Tạm dừng
+  CLOSED    // Đã đóng
+  COMPLETED // Hoàn thành
+}
+
+enum ApplicationStatus {
+  PENDING   // Đang chờ duyệt
+  APPROVED  // Đã duyệt
+  REJECTED  // Từ chối
+  SHIPPED   // Brand đã gửi hàng
+  RECEIVED  // KOL đã nhận hàng
+  SUBMITTED // KOL đã nộp link review
+  COMPLETED // Brand xác nhận hoàn thành
+}
+
+// 3. Định nghĩa các Model (Bảng dữ liệu)
+
+// Bảng User chính (Dùng để đăng nhập)
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String    // Hashed password
+  role          Role      @default(BRAND)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Quan hệ 1-1: Một User có thể là Brand hoặc KOL
+  brandProfile  BrandProfile?
+  kolProfile    KolProfile?
+}
+
+// Hồ sơ Brand (Thông tin doanh nghiệp)
+model BrandProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  companyName String
+  website     String?
+  industry    String?  // Ngành hàng (Beauty, Tech, v.v.)
+  description String?  // Giới thiệu công ty
+  logo        String?  // URL ảnh logo
+  
+  user        User     @relation(fields: [userId], references: [id])
+  campaigns   Campaign[] // Một Brand có nhiều Campaign
+}
+
+// Hồ sơ KOL (Thông tin Reviewer)
+model KolProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  fullName    String
+  bio         String?
+  avatar      String?
+  platforms   Json?    // Lưu JSON: { "tiktok": "handle", "youtube": "handle" }
+  followers   Int      @default(0) // Tổng follower ước tính
+  categories  String[] // Array: ["Beauty", "Fashion"]
+  
+  user        User     @relation(fields: [userId], references: [id])
+  applications Application[] // Một KOL apply nhiều Campaign
+}
+
+// Chiến dịch (Campaign)
+model Campaign {
+  id            String          @id @default(uuid())
+  brandId       String
+  title         String
+  description   String
+  productName   String
+  productValue  String          // Ví dụ: "500.000 VNĐ"
+  requirements  String          // Yêu cầu công việc
+  platform      String          // TikTok, YouTube, Facebook
+  status        CampaignStatus  @default(DRAFT)
+  deadline      DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  brand         BrandProfile    @relation(fields: [brandId], references: [id])
+  applications  Application[]
+}
+
+// Đơn ứng tuyển (Application) - Bảng trung gian nối KOL và Campaign
+model Application {
+  id          String            @id @default(uuid())
+  campaignId  String
+  kolId       String
+  status      ApplicationStatus @default(PENDING)
+  messsage    String?           // Lời nhắn của KOL khi apply
+  contentLink String?           // Link bài review KOL nộp
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  campaign    Campaign          @relation(fields: [campaignId], references: [id])
+  kol         KolProfile        @relation(fields: [kolId], references: [id])
+
+  @@unique([campaignId, kolId]) // Một KOL chỉ apply 1 lần cho 1 campaign
+}
