@@ -8,7 +8,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 2. Định nghĩa các Enum (Danh sách cố định)
+// 2. Enum trạng thái
 enum Role {
   ADMIN
   BRAND
@@ -16,78 +16,102 @@ enum Role {
 }
 
 enum CampaignStatus {
-  DRAFT     // Nháp
-  ACTIVE    // Đang chạy
-  PAUSED    // Tạm dừng
-  CLOSED    // Đã đóng
-  COMPLETED // Hoàn thành
+  DRAFT
+  ACTIVE
+  LOCKED
+  COMPLETED
+  CANCELLED
 }
 
 enum ApplicationStatus {
-  PENDING   // Đang chờ duyệt
-  APPROVED  // Đã duyệt
-  REJECTED  // Từ chối
-  SHIPPED   // Brand đã gửi hàng
-  RECEIVED  // KOL đã nhận hàng
-  SUBMITTED // KOL đã nộp link review
-  COMPLETED // Brand xác nhận hoàn thành
+  PENDING
+  APPROVED
+  SHIPPING
+  RECEIVED
+  SUBMITTED
+  COMPLETED
+  PAID
+  REJECTED
 }
 
-// 3. Định nghĩa các Model (Bảng dữ liệu)
-
-// Bảng User chính (Dùng để đăng nhập)
+// 3. Models
 model User {
   id            String    @id @default(uuid())
   email         String    @unique
-  password      String    // Hashed password
+  password      String
   role          Role      @default(BRAND)
+  isVerified    Boolean   @default(false)
+  isBanned      Boolean   @default(false) // NEW: Cờ chặn đăng nhập vĩnh viễn (Tech Debt #4)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Quan hệ 1-1: Một User có thể là Brand hoặc KOL
   brandProfile  BrandProfile?
   kolProfile    KolProfile?
+  notifications Notification[]
+  messages      Message[]
 }
 
-// Hồ sơ Brand (Thông tin doanh nghiệp)
+// Model Thông báo
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   // Người nhận thông báo
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  link      String?  // Link đích khi bấm vào
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
 model BrandProfile {
   id          String   @id @default(uuid())
   userId      String   @unique
   companyName String
+  logo        String?
   website     String?
-  industry    String?  // Ngành hàng (Beauty, Tech, v.v.)
-  description String?  // Giới thiệu công ty
-  logo        String?  // URL ảnh logo
+  industry    String?
+  description String?
+  taxCode     String?
+  address     String?
+  phone       String?
   
   user        User     @relation(fields: [userId], references: [id])
-  campaigns   Campaign[] // Một Brand có nhiều Campaign
+  campaigns   Campaign[]
 }
 
-// Hồ sơ KOL (Thông tin Reviewer)
 model KolProfile {
   id          String   @id @default(uuid())
   userId      String   @unique
   fullName    String
-  bio         String?
   avatar      String?
-  platforms   Json?    // Lưu JSON: { "tiktok": "handle", "youtube": "handle" }
-  followers   Int      @default(0) // Tổng follower ước tính
-  categories  String[] // Array: ["Beauty", "Fashion"]
+  bio         String?
+  categories  String[]
+  platforms   Json?
+  followers   Int      @default(0)
+  
+  // Thông tin liên hệ & Thanh toán
+  phone       String?
+  socialLink  String?  // Link kênh chính (Tech Debt #9)
+  address     String?
+  city        String?
+  bankName    String?
+  bankAccount String?
   
   user        User     @relation(fields: [userId], references: [id])
-  applications Application[] // Một KOL apply nhiều Campaign
+  applications Application[]
 }
 
-// Chiến dịch (Campaign)
 model Campaign {
   id            String          @id @default(uuid())
   brandId       String
   title         String
-  description   String
+  description   String          @db.Text
   productName   String
-  productValue  String          // Ví dụ: "500.000 VNĐ"
-  requirements  String          // Yêu cầu công việc
-  platform      String          // TikTok, YouTube, Facebook
+  productImage  String?
+  productValue  String
+  requirements  String          @db.Text
+  platform      String
   status        CampaignStatus  @default(DRAFT)
   deadline      DateTime?
   createdAt     DateTime        @default(now())
@@ -97,19 +121,51 @@ model Campaign {
   applications  Application[]
 }
 
-// Đơn ứng tuyển (Application) - Bảng trung gian nối KOL và Campaign
 model Application {
-  id          String            @id @default(uuid())
-  campaignId  String
-  kolId       String
-  status      ApplicationStatus @default(PENDING)
-  messsage    String?           // Lời nhắn của KOL khi apply
-  contentLink String?           // Link bài review KOL nộp
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id            String            @id @default(uuid())
+  campaignId    String
+  kolId         String
+  status        ApplicationStatus @default(PENDING)
+  
+  // Logistics
+  shippingCode  String?
+  carrier       String?
+  
+  // Submission
+  contentLink   String?
+  submitNote    String?
+  
+  // Timestamps
+  approvedAt    DateTime?
+  shippedAt     DateTime?
+  receivedAt    DateTime?
+  submittedAt   DateTime?
+  completedAt   DateTime?
 
-  campaign    Campaign          @relation(fields: [campaignId], references: [id])
-  kol         KolProfile        @relation(fields: [kolId], references: [id])
+  // Review (Đánh giá 2 chiều)
+  rating        Int?              // Brand đánh giá KOL
+  review        String?
+  kolRating     Int?              // KOL đánh giá Brand
+  kolReview     String?
 
-  @@unique([campaignId, kolId]) // Một KOL chỉ apply 1 lần cho 1 campaign
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  campaign      Campaign          @relation(fields: [campaignId], references: [id])
+  kol           KolProfile        @relation(fields: [kolId], references: [id])
+  messages      Message[]
+
+  @@unique([campaignId, kolId])
+}
+
+// Model Tin nhắn
+model Message {
+  id            String      @id @default(uuid())
+  content       String      @db.Text
+  senderId      String
+  applicationId String
+  createdAt     DateTime    @default(now())
+
+  sender        User        @relation(fields: [senderId], references: [id])
+  application   Application @relation(fields: [applicationId], references: [id])
 }

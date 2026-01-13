@@ -1,0 +1,635 @@
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateCampaignDto } from './dto/create-campaign.dto';
+import { ApproveApplicationDto, SubmitContentDto } from './dto/booking.dto';
+export declare class CampaignsService {
+    private prisma;
+    constructor(prisma: PrismaService);
+    create(userId: string, dto: CreateCampaignDto): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        description: string;
+        title: string;
+        productName: string;
+        productImage: string | null;
+        productValue: string;
+        requirements: string;
+        platform: string;
+        status: import(".prisma/client").$Enums.CampaignStatus;
+        deadline: Date | null;
+        brandId: string;
+    }>;
+    findAll(search?: string, platform?: string): Promise<({
+        brand: {
+            user: {
+                isVerified: boolean;
+            };
+        } & {
+            id: string;
+            companyName: string;
+            logo: string | null;
+            website: string | null;
+            industry: string | null;
+            description: string | null;
+            taxCode: string | null;
+            address: string | null;
+            phone: string | null;
+            userId: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        description: string;
+        title: string;
+        productName: string;
+        productImage: string | null;
+        productValue: string;
+        requirements: string;
+        platform: string;
+        status: import(".prisma/client").$Enums.CampaignStatus;
+        deadline: Date | null;
+        brandId: string;
+    })[]>;
+    apply(campaignId: string, userId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.ApplicationStatus;
+        shippingCode: string | null;
+        carrier: string | null;
+        contentLink: string | null;
+        submitNote: string | null;
+        approvedAt: Date | null;
+        shippedAt: Date | null;
+        receivedAt: Date | null;
+        submittedAt: Date | null;
+        completedAt: Date | null;
+        rating: number | null;
+        review: string | null;
+        kolRating: number | null;
+        kolReview: string | null;
+        campaignId: string;
+        kolId: string;
+    }>;
+    update(id: string, userId: string, data: any): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        description: string;
+        title: string;
+        productName: string;
+        productImage: string | null;
+        productValue: string;
+        requirements: string;
+        platform: string;
+        status: import(".prisma/client").$Enums.CampaignStatus;
+        deadline: Date | null;
+        brandId: string;
+    }>;
+    remove(id: string, userId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        description: string;
+        title: string;
+        productName: string;
+        productImage: string | null;
+        productValue: string;
+        requirements: string;
+        platform: string;
+        status: import(".prisma/client").$Enums.CampaignStatus;
+        deadline: Date | null;
+        brandId: string;
+    }>;
+    approveApplication(applicationId: string, dto: ApproveApplicationDto): Promise<{
+        campaign: {
+            brand: {
+                id: string;
+                companyName: string;
+                logo: string | null;
+                website: string | null;
+                industry: string | null;
+                description: string | null;
+                taxCode: string | null;
+                address: string | null;
+                phone: string | null;
+                userId: string;
+            };
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            description: string;
+            title: string;
+            productName: string;
+            productImage: string | null;
+            productValue: string;
+            requirements: string;
+            platform: string;
+            status: import(".prisma/client").$Enums.CampaignStatus;
+            deadline: Date | null;
+            brandId: string;
+        };
+        kol: {
+            id: string;
+            address: string | null;
+            phone: string | null;
+            fullName: string;
+            avatar: string | null;
+            bio: string | null;
+            categories: string[];
+            platforms: import("@prisma/client/runtime/library").JsonValue | null;
+            followers: number;
+            socialLink: string | null;
+            city: string | null;
+            bankName: string | null;
+            bankAccount: string | null;
+            userId: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.ApplicationStatus;
+        shippingCode: string | null;
+        carrier: string | null;
+        contentLink: string | null;
+        submitNote: string | null;
+        approvedAt: Date | null;
+        shippedAt: Date | null;
+        receivedAt: Date | null;
+        submittedAt: Date | null;
+        completedAt: Date | null;
+        rating: number | null;
+        review: string | null;
+        kolRating: number | null;
+        kolReview: string | null;
+        campaignId: string;
+        kolId: string;
+    }>;
+    confirmReceived(applicationId: string): Promise<{
+        campaign: {
+            brand: {
+                id: string;
+                companyName: string;
+                logo: string | null;
+                website: string | null;
+                industry: string | null;
+                description: string | null;
+                taxCode: string | null;
+                address: string | null;
+                phone: string | null;
+                userId: string;
+            };
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            description: string;
+            title: string;
+            productName: string;
+            productImage: string | null;
+            productValue: string;
+            requirements: string;
+            platform: string;
+            status: import(".prisma/client").$Enums.CampaignStatus;
+            deadline: Date | null;
+            brandId: string;
+        };
+        kol: {
+            id: string;
+            address: string | null;
+            phone: string | null;
+            fullName: string;
+            avatar: string | null;
+            bio: string | null;
+            categories: string[];
+            platforms: import("@prisma/client/runtime/library").JsonValue | null;
+            followers: number;
+            socialLink: string | null;
+            city: string | null;
+            bankName: string | null;
+            bankAccount: string | null;
+            userId: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.ApplicationStatus;
+        shippingCode: string | null;
+        carrier: string | null;
+        contentLink: string | null;
+        submitNote: string | null;
+        approvedAt: Date | null;
+        shippedAt: Date | null;
+        receivedAt: Date | null;
+        submittedAt: Date | null;
+        completedAt: Date | null;
+        rating: number | null;
+        review: string | null;
+        kolRating: number | null;
+        kolReview: string | null;
+        campaignId: string;
+        kolId: string;
+    }>;
+    submitContent(applicationId: string, dto: SubmitContentDto): Promise<{
+        campaign: {
+            brand: {
+                id: string;
+                companyName: string;
+                logo: string | null;
+                website: string | null;
+                industry: string | null;
+                description: string | null;
+                taxCode: string | null;
+                address: string | null;
+                phone: string | null;
+                userId: string;
+            };
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            description: string;
+            title: string;
+            productName: string;
+            productImage: string | null;
+            productValue: string;
+            requirements: string;
+            platform: string;
+            status: import(".prisma/client").$Enums.CampaignStatus;
+            deadline: Date | null;
+            brandId: string;
+        };
+        kol: {
+            id: string;
+            address: string | null;
+            phone: string | null;
+            fullName: string;
+            avatar: string | null;
+            bio: string | null;
+            categories: string[];
+            platforms: import("@prisma/client/runtime/library").JsonValue | null;
+            followers: number;
+            socialLink: string | null;
+            city: string | null;
+            bankName: string | null;
+            bankAccount: string | null;
+            userId: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.ApplicationStatus;
+        shippingCode: string | null;
+        carrier: string | null;
+        contentLink: string | null;
+        submitNote: string | null;
+        approvedAt: Date | null;
+        shippedAt: Date | null;
+        receivedAt: Date | null;
+        submittedAt: Date | null;
+        completedAt: Date | null;
+        rating: number | null;
+        review: string | null;
+        kolRating: number | null;
+        kolReview: string | null;
+        campaignId: string;
+        kolId: string;
+    }>;
+    reviewApplication(applicationId: string, rating: number, review: string): Promise<{
+        campaign: {
+            brand: {
+                id: string;
+                companyName: string;
+                logo: string | null;
+                website: string | null;
+                industry: string | null;
+                description: string | null;
+                taxCode: string | null;
+                address: string | null;
+                phone: string | null;
+                userId: string;
+            };
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            description: string;
+            title: string;
+            productName: string;
+            productImage: string | null;
+            productValue: string;
+            requirements: string;
+            platform: string;
+            status: import(".prisma/client").$Enums.CampaignStatus;
+            deadline: Date | null;
+            brandId: string;
+        };
+        kol: {
+            id: string;
+            address: string | null;
+            phone: string | null;
+            fullName: string;
+            avatar: string | null;
+            bio: string | null;
+            categories: string[];
+            platforms: import("@prisma/client/runtime/library").JsonValue | null;
+            followers: number;
+            socialLink: string | null;
+            city: string | null;
+            bankName: string | null;
+            bankAccount: string | null;
+            userId: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.ApplicationStatus;
+        shippingCode: string | null;
+        carrier: string | null;
+        contentLink: string | null;
+        submitNote: string | null;
+        approvedAt: Date | null;
+        shippedAt: Date | null;
+        receivedAt: Date | null;
+        submittedAt: Date | null;
+        completedAt: Date | null;
+        rating: number | null;
+        review: string | null;
+        kolRating: number | null;
+        kolReview: string | null;
+        campaignId: string;
+        kolId: string;
+    }>;
+    kolReviewBrand(applicationId: string, rating: number, review: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.ApplicationStatus;
+        shippingCode: string | null;
+        carrier: string | null;
+        contentLink: string | null;
+        submitNote: string | null;
+        approvedAt: Date | null;
+        shippedAt: Date | null;
+        receivedAt: Date | null;
+        submittedAt: Date | null;
+        completedAt: Date | null;
+        rating: number | null;
+        review: string | null;
+        kolRating: number | null;
+        kolReview: string | null;
+        campaignId: string;
+        kolId: string;
+    }>;
+    getMyJobs(userId: string): Promise<({
+        campaign: {
+            brand: {
+                id: string;
+                companyName: string;
+                logo: string | null;
+                website: string | null;
+                industry: string | null;
+                description: string | null;
+                taxCode: string | null;
+                address: string | null;
+                phone: string | null;
+                userId: string;
+            };
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            description: string;
+            title: string;
+            productName: string;
+            productImage: string | null;
+            productValue: string;
+            requirements: string;
+            platform: string;
+            status: import(".prisma/client").$Enums.CampaignStatus;
+            deadline: Date | null;
+            brandId: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.ApplicationStatus;
+        shippingCode: string | null;
+        carrier: string | null;
+        contentLink: string | null;
+        submitNote: string | null;
+        approvedAt: Date | null;
+        shippedAt: Date | null;
+        receivedAt: Date | null;
+        submittedAt: Date | null;
+        completedAt: Date | null;
+        rating: number | null;
+        review: string | null;
+        kolRating: number | null;
+        kolReview: string | null;
+        campaignId: string;
+        kolId: string;
+    })[]>;
+    getJobDetail(id: string): Promise<({
+        campaign: {
+            brand: {
+                id: string;
+                companyName: string;
+                logo: string | null;
+                website: string | null;
+                industry: string | null;
+                description: string | null;
+                taxCode: string | null;
+                address: string | null;
+                phone: string | null;
+                userId: string;
+            };
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            description: string;
+            title: string;
+            productName: string;
+            productImage: string | null;
+            productValue: string;
+            requirements: string;
+            platform: string;
+            status: import(".prisma/client").$Enums.CampaignStatus;
+            deadline: Date | null;
+            brandId: string;
+        };
+        kol: {
+            id: string;
+            address: string | null;
+            phone: string | null;
+            fullName: string;
+            avatar: string | null;
+            bio: string | null;
+            categories: string[];
+            platforms: import("@prisma/client/runtime/library").JsonValue | null;
+            followers: number;
+            socialLink: string | null;
+            city: string | null;
+            bankName: string | null;
+            bankAccount: string | null;
+            userId: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.ApplicationStatus;
+        shippingCode: string | null;
+        carrier: string | null;
+        contentLink: string | null;
+        submitNote: string | null;
+        approvedAt: Date | null;
+        shippedAt: Date | null;
+        receivedAt: Date | null;
+        submittedAt: Date | null;
+        completedAt: Date | null;
+        rating: number | null;
+        review: string | null;
+        kolRating: number | null;
+        kolReview: string | null;
+        campaignId: string;
+        kolId: string;
+    }) | null>;
+    findOne(id: string): Promise<{
+        brand: {
+            user: {
+                isVerified: boolean;
+            };
+        } & {
+            id: string;
+            companyName: string;
+            logo: string | null;
+            website: string | null;
+            industry: string | null;
+            description: string | null;
+            taxCode: string | null;
+            address: string | null;
+            phone: string | null;
+            userId: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        description: string;
+        title: string;
+        productName: string;
+        productImage: string | null;
+        productValue: string;
+        requirements: string;
+        platform: string;
+        status: import(".prisma/client").$Enums.CampaignStatus;
+        deadline: Date | null;
+        brandId: string;
+    }>;
+    getBrandCampaigns(userId: string): Promise<({
+        _count: {
+            applications: number;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        description: string;
+        title: string;
+        productName: string;
+        productImage: string | null;
+        productValue: string;
+        requirements: string;
+        platform: string;
+        status: import(".prisma/client").$Enums.CampaignStatus;
+        deadline: Date | null;
+        brandId: string;
+    })[]>;
+    getApplicants(campaignId: string): Promise<({
+        kol: {
+            user: {
+                isVerified: boolean;
+            };
+        } & {
+            id: string;
+            address: string | null;
+            phone: string | null;
+            fullName: string;
+            avatar: string | null;
+            bio: string | null;
+            categories: string[];
+            platforms: import("@prisma/client/runtime/library").JsonValue | null;
+            followers: number;
+            socialLink: string | null;
+            city: string | null;
+            bankName: string | null;
+            bankAccount: string | null;
+            userId: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.ApplicationStatus;
+        shippingCode: string | null;
+        carrier: string | null;
+        contentLink: string | null;
+        submitNote: string | null;
+        approvedAt: Date | null;
+        shippedAt: Date | null;
+        receivedAt: Date | null;
+        submittedAt: Date | null;
+        completedAt: Date | null;
+        rating: number | null;
+        review: string | null;
+        kolRating: number | null;
+        kolReview: string | null;
+        campaignId: string;
+        kolId: string;
+    })[]>;
+    cancelApplication(applicationId: string, userId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.ApplicationStatus;
+        shippingCode: string | null;
+        carrier: string | null;
+        contentLink: string | null;
+        submitNote: string | null;
+        approvedAt: Date | null;
+        shippedAt: Date | null;
+        receivedAt: Date | null;
+        submittedAt: Date | null;
+        completedAt: Date | null;
+        rating: number | null;
+        review: string | null;
+        kolRating: number | null;
+        kolReview: string | null;
+        campaignId: string;
+        kolId: string;
+    }>;
+    closeCampaign(campaignId: string, userId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        description: string;
+        title: string;
+        productName: string;
+        productImage: string | null;
+        productValue: string;
+        requirements: string;
+        platform: string;
+        status: import(".prisma/client").$Enums.CampaignStatus;
+        deadline: Date | null;
+        brandId: string;
+    }>;
+}

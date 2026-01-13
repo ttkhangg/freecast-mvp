@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional } from 'class-validator';
 
 export class CreateCampaignDto {
   @IsNotEmpty()
@@ -19,6 +19,15 @@ export class CreateCampaignDto {
   @IsNotEmpty()
   platform: string;
 
-  @IsNotEmpty()
-  brandId: string; // Tạm thời client gửi lên, sau này sẽ lấy từ Token
+  @IsOptional()
+  @IsString()
+  deadline?: string;
+
+  @IsOptional()
+  brandId?: string; 
+
+  // FIX: Thêm trường này để lưu ảnh
+  @IsOptional()
+  @IsString()
+  productImage?: string;
 }

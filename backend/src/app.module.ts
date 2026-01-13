@@ -3,9 +3,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
+import { AdminModule } from './admin/admin.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
-  imports: [AuthModule, CampaignsModule],
+  imports: [AuthModule, CampaignsModule, AdminModule, ChatModule],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -1,16 +1,21 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, CheckCircle2, ShieldCheck, Zap, Globe, Users, TrendingUp, ChevronDown, Menu, X, DollarSign, Package, BarChart, Search, AlertTriangle, Briefcase, Award, UserCheck, Star, Sparkles, Frown, Mail, MapPin, Phone, XCircle, CheckCircle } from 'lucide-react';
+// FIX: Đã thêm ShieldCheck vào danh sách import
+import { ArrowRight, CheckCircle2, ShieldCheck, Zap, Globe, Users, TrendingUp, ChevronDown, Menu, X, DollarSign, Package, BarChart, Search, AlertTriangle, Briefcase, Award, UserCheck, Star, Sparkles, Frown, Mail, MapPin, Phone, XCircle, CheckCircle, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Cookies from 'js-cookie';
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'brand' | 'kol'>('brand');
   const [isClient, setIsClient] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
+    const token = Cookies.get('token');
+    if (token) setIsLoggedIn(true);
   }, []);
 
   const scrollToSection = (id: string) => {
@@ -54,7 +59,7 @@ export default function Home() {
           freecast: "Phân tích sâu nhân khẩu học (độ tuổi, vị trí) và hành vi mua sắm của fan để dự đoán tỷ lệ chuyển đổi."
         },
         { 
-          title: "Hệ thống Chống Gian lận", icon: ShieldCheck, 
+          title: "Hệ thống Chống Gian lận", icon: ShieldCheck, // Đã fix import ShieldCheck
           traditional: "Không có công cụ kiểm chứng, dễ bị qua mặt bởi các tool buff like/comment.",
           freecast: "Lớp bảo mật 3 tầng tự động phát hiện dấu hiệu bất thường, cảnh báo ngay lập tức để bảo vệ ngân sách."
         },
@@ -146,6 +151,7 @@ export default function Home() {
   if (!isClient) return null;
 
   const currentContent = content[activeTab];
+  const currentSEO = content[activeTab].seo;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-indigo-500/30 overflow-x-hidden">
@@ -159,12 +165,20 @@ export default function Home() {
           </div>
           
           <div className="hidden md:flex gap-4 items-center">
-            <Link href="/login" className="text-sm font-semibold text-white hover:text-indigo-300 transition-colors px-4 py-2">
-              Đăng nhập
-            </Link>
-            <Link href="/register" className="px-6 py-2.5 bg-white text-slate-950 rounded-full text-sm font-bold hover:bg-indigo-50 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95">
-              Tham gia ngay
-            </Link>
+            {isLoggedIn ? (
+              <Link href="/dashboard" className="px-6 py-2.5 bg-white text-slate-950 rounded-full text-sm font-bold hover:bg-indigo-50 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 flex items-center gap-2">
+                <LayoutGrid size={16}/> Vào Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="text-sm font-semibold text-white hover:text-indigo-300 transition-colors px-4 py-2">
+                  Đăng nhập
+                </Link>
+                <Link href="/register" className="px-6 py-2.5 bg-white text-slate-950 rounded-full text-sm font-bold hover:bg-indigo-50 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95">
+                  Tham gia ngay
+                </Link>
+              </>
+            )}
           </div>
 
           <button className="md:hidden p-2 text-slate-300 hover:text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -172,6 +186,7 @@ export default function Home() {
           </button>
         </div>
 
+        {/* Mobile Menu Dropdown */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div 
@@ -181,8 +196,14 @@ export default function Home() {
               className="md:hidden bg-slate-900 border-b border-white/10 overflow-hidden"
             >
               <div className="flex flex-col p-6 gap-3">
-                <Link href="/login" className="text-center w-full py-3 font-semibold text-white bg-white/5 rounded-xl border border-white/10">Đăng nhập</Link>
-                <Link href="/register" className="text-center w-full py-3 font-bold text-slate-950 bg-white rounded-xl shadow-lg">Đăng ký tham gia</Link>
+                {isLoggedIn ? (
+                    <Link href="/dashboard" className="text-center w-full py-3 font-bold text-slate-950 bg-white rounded-xl shadow-lg">Vào Dashboard</Link>
+                ) : (
+                    <>
+                        <Link href="/login" className="text-center w-full py-3 font-semibold text-white bg-white/5 rounded-xl border border-white/10">Đăng nhập</Link>
+                        <Link href="/register" className="text-center w-full py-3 font-bold text-slate-950 bg-white rounded-xl shadow-lg">Đăng ký tham gia</Link>
+                    </>
+                )}
               </div>
             </motion.div>
           )}
@@ -231,14 +252,15 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.5 }}
             className="flex flex-col sm:flex-row gap-4 justify-center items-center px-4"
           >
-            <motion.button 
-              onClick={() => scrollToSection('role-selection')} 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="h-14 w-full sm:w-auto px-10 bg-indigo-600 rounded-full font-bold text-lg hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 group shadow-lg shadow-indigo-500/30"
-            >
-              Khám phá ngay <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-            </motion.button>
+            {isLoggedIn ? (
+                <Link href="/dashboard" className="h-14 w-full sm:w-auto px-10 bg-indigo-600 rounded-full font-bold text-lg hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 group shadow-lg shadow-indigo-500/30">
+                  Truy cập Dashboard <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+                </Link>
+            ) : (
+                <button onClick={() => scrollToSection('role-selection')} className="h-14 w-full sm:w-auto px-10 bg-indigo-600 rounded-full font-bold text-lg hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 group shadow-lg shadow-indigo-500/30">
+                  Khám phá ngay <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+                </button>
+            )}
           </motion.div>
         </div>
       </section>
@@ -436,14 +458,14 @@ export default function Home() {
             >
               <div className="flex-1">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold mb-6 uppercase tracking-wider">
-                  <Search size={14} /> {currentContent.seo.tag}
+                  <Search size={14} /> {currentSEO.tag}
                 </div>
-                <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">{currentContent.seo.title}</h2>
+                <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">{currentSEO.title}</h2>
                 <p className="text-slate-400 text-lg mb-8 leading-relaxed">
-                  {currentContent.seo.desc}
+                  {currentSEO.desc}
                 </p>
                 <ul className="space-y-4 mb-8">
-                  {currentContent.seo.benefits.map((item, i) => (
+                  {currentSEO.benefits.map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-slate-300">
                       <CheckCircle2 className="text-indigo-500" size={20} /> {item}
                     </li>
@@ -456,11 +478,11 @@ export default function Home() {
                 <div className="bg-white rounded-xl p-6 shadow-2xl max-w-md mx-auto border border-slate-200 relative transform rotate-1 hover:rotate-0 transition-all duration-500">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-xs">F</div>
-                    <div className="text-xs text-slate-800">FreeCast <span className="text-slate-400">› {currentContent.seo.mockup.breadcrumb}</span></div>
+                    <div className="text-xs text-slate-800">FreeCast <span className="text-slate-400">› {currentSEO.mockup.breadcrumb}</span></div>
                   </div>
-                  <h3 className="text-xl text-[#1a0dab] hover:underline cursor-pointer font-medium mb-1">{currentContent.seo.mockup.title}</h3>
+                  <h3 className="text-xl text-[#1a0dab] hover:underline cursor-pointer font-medium mb-1">{currentSEO.mockup.title}</h3>
                   <p className="text-sm text-slate-600 leading-relaxed">
-                    {currentContent.seo.mockup.desc}
+                    {currentSEO.mockup.desc}
                   </p>
                   {/* Decoration */}
                   <div className="absolute -top-4 -right-4 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">Google Index</div>
