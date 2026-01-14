@@ -1,268 +1,223 @@
 'use client';
-import { useState, useEffect } from 'react';
-import api from '@/utils/api';
-import { Save, MapPin, Phone, CreditCard, User, Loader2, Link as LinkIcon, Camera } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import DashboardLayout from '@/components/DashboardLayout';
-import VerifiedBadge from '@/components/VerifiedBadge';
 
-interface KolProfileData {
-  fullName: string;
-  avatar: string;
-  bio: string;
-  phone: string;
-  socialLink: string;
-  address: string;
-  bankName: string;
-  bankAccount: string;
-}
+import { useState, useEffect } from 'react';
+import { useAuthStore } from '@/store/useAuthStore';
+import DashboardLayout from '@/components/DashboardLayout';
+import AuthGuard from '@/components/AuthGuard';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useUploadImage, useUpdateProfile } from '@/hooks/useProfile';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Camera, Save, Loader2, User as UserIcon } from 'lucide-react';
+
+// Schema Validation
+const profileSchema = z.object({
+  fullName: z.string().min(2, 'Họ tên quá ngắn').max(50),
+  bio: z.string().optional(),
+  phone: z.string().optional(),
+  // Cho phép chuỗi rỗng HOẶC url hợp lệ
+  socialLink: z.union([z.string().url('Link không hợp lệ'), z.literal('')]).optional(),
+});
+
+type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
-  const router = useRouter();
-  const [profile, setProfile] = useState<KolProfileData>({
-    fullName: '', avatar: '', bio: '', phone: '', socialLink: '', address: '', bankName: '', bankAccount: ''
+  const { user } = useAuthStore();
+  const { mutateAsync: uploadImage, isPending: isUploading } = useUploadImage();
+  const { mutate: updateProfile, isPending: isUpdating } = useUpdateProfile();
+  
+  const [previewAvatar, setPreviewAvatar] = useState<string | null>(user?.avatar || null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      fullName: user?.fullName || '',
+      bio: user?.bio || '',
+      phone: user?.phone || '',
+      socialLink: user?.socialLink || '',
+    },
   });
-  const [role, setRole] = useState('');
-  const [isVerified, setIsVerified] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false); // State cho upload ảnh
-  const [fetching, setFetching] = useState(true);
 
+  // Reset form khi user load xong
   useEffect(() => {
-    api.get('/auth/me').then(res => {
-      setRole(res.data.role);
-      setIsVerified(res.data.isVerified);
-      
-      const p = res.data.role === 'BRAND' ? res.data.brandProfile : res.data.kolProfile;
-      if(p) {
-        setProfile({
-          fullName: p.fullName || p.companyName || '',
-          avatar: p.avatar || p.logo || '', // Map cả logo của brand
-          bio: p.bio || p.description || '',
-          phone: p.phone || '',
-          socialLink: p.socialLink || p.website || '',
-          address: p.address || '',
-          bankName: p.bankName || '',
-          bankAccount: p.bankAccount || ''
-        });
-      }
-      setFetching(false);
-    }).catch(() => {
-      setFetching(false);
-    });
-  }, []);
-
-  // Hàm xử lý upload ảnh riêng cho Avatar
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    // --- CẤU HÌNH CLOUDINARY (Giống ImageUpload) ---
-    const UPLOAD_PRESET = 'freecast_preset'; 
-    const CLOUD_NAME = 'dhf1fioml'; 
-    formData.append('upload_preset', UPLOAD_PRESET);
-    // ---------------------------------------------
-
-    try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
-        method: 'POST',
-        body: formData
+    if (user) {
+      reset({
+        fullName: user.fullName,
+        bio: user.bio || '',
+        phone: user.phone || '',
+        socialLink: user.socialLink || '',
       });
-      const data = await res.json();
-      if (data.secure_url) {
-          setProfile(prev => ({ ...prev, avatar: data.secure_url }));
+      setPreviewAvatar(user.avatar || null);
+    }
+  }, [user, reset]);
+
+  // Xử lý chọn ảnh
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewAvatar(objectUrl);
+    }
+  };
+
+  // Xử lý Submit
+  const onSubmit = async (data: ProfileFormValues) => {
+    let avatarUrl = user?.avatar;
+
+    // 1. Upload ảnh (nếu có chọn)
+    if (selectedFile) {
+      try {
+        avatarUrl = await uploadImage(selectedFile);
+      } catch (error) {
+        // Lỗi đã được hook xử lý toast
+        return; 
       }
-    } catch (err) {
-      alert('Lỗi upload ảnh.');
-    } finally {
-      setUploading(false);
     }
+
+    // 2. Chuẩn bị data (Biến chuỗi rỗng thành undefined để backend không validate sai)
+    const payload = {
+      ...data,
+      avatar: avatarUrl,
+      socialLink: data.socialLink === '' ? undefined : data.socialLink,
+      bio: data.bio === '' ? undefined : data.bio,
+      phone: data.phone === '' ? undefined : data.phone,
+    };
+
+    // 3. Gọi API
+    updateProfile(payload);
   };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const endpoint = role === 'BRAND' ? '/auth/profile/brand' : '/auth/profile/kol';
-      
-      // Map dữ liệu cho đúng với Backend
-      const payload = role === 'BRAND' ? {
-        companyName: profile.fullName,
-        description: profile.bio,
-        website: profile.socialLink,
-        logo: profile.avatar, // Backend Brand dùng 'logo'
-        phone: profile.phone,
-        address: profile.address
-      } : profile; // KOL dùng đúng key 'avatar'
-
-      await api.put(endpoint, payload); 
-      alert('Đã lưu hồ sơ thành công!'); 
-    } catch (err) {
-      alert('Lỗi khi lưu hồ sơ.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (fetching) return (
-    <DashboardLayout>
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="animate-spin text-indigo-600 h-8 w-8"/>
-      </div>
-    </DashboardLayout>
-  );
 
   return (
-    <DashboardLayout>
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-slate-900 flex items-center gap-2">
-            Hồ sơ cá nhân {isVerified && <VerifiedBadge />}
-        </h1>
-
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-          {/* Header màu với Avatar */}
-          <div className="bg-indigo-600 p-8 text-white flex flex-col md:flex-row items-center gap-6">
-            <div className="relative group">
-                <div className="w-24 h-24 rounded-full bg-white/20 border-4 border-white/30 overflow-hidden flex items-center justify-center relative">
-                    {uploading ? (
-                        <Loader2 className="animate-spin text-white" />
-                    ) : profile.avatar ? (
-                        <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                        <User size={40} className="text-white/50" />
-                    )}
-                </div>
-                
-                {/* Nút upload (Camera icon) */}
-                <label className="absolute -bottom-2 -right-2 bg-white text-indigo-600 p-2 rounded-full shadow-lg cursor-pointer hover:bg-slate-100 transition-colors z-10">
-                    <Camera size={16} />
-                    <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} disabled={uploading} />
-                </label>
-            </div>
-            
-            <div className="text-center md:text-left">
-                <h2 className="text-2xl font-bold">{profile.fullName || 'Chưa đặt tên'}</h2>
-                <p className="opacity-90 mt-1">{role === 'BRAND' ? 'Doanh nghiệp' : 'Creator'}</p>
-            </div>
+    <AuthGuard>
+      <DashboardLayout>
+        <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+          <div className="mb-8 border-b border-gray-200 pb-5">
+            <h2 className="text-2xl font-bold leading-7 text-gray-900">
+              Hồ sơ cá nhân
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Quản lý thông tin hiển thị của bạn trên nền tảng FreeCast.
+            </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-8 grid md:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <h3 className="font-bold text-lg flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2">
-                <User size={20} className="text-indigo-600" /> Thông tin cơ bản
-              </h3>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Tên hiển thị / Công ty</label>
-                <input 
-                  type="text" 
-                  className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 bg-white placeholder:text-slate-400" 
-                  value={profile.fullName} 
-                  onChange={e => setProfile({...profile, fullName: e.target.value})} 
-                  placeholder="Nhập tên..."
-                />
-              </div>
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-8">
               
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Link kênh chính / Website</label>
-                <div className="relative">
-                    <LinkIcon size={16} className="absolute left-3 top-3.5 text-slate-400" />
-                    <input 
-                        type="url" 
-                        className="w-full pl-10 p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 bg-white placeholder:text-slate-400" 
-                        value={profile.socialLink} 
-                        onChange={e => setProfile({...profile, socialLink: e.target.value})} 
-                        placeholder="https://..."
-                    />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Giới thiệu (Bio)</label>
-                <textarea 
-                  className="w-full p-3 border border-slate-200 rounded-xl h-32 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 bg-white placeholder:text-slate-400 resize-none" 
-                  value={profile.bio} 
-                  onChange={e => setProfile({...profile, bio: e.target.value})}
-                  placeholder="Mô tả ngắn về bản thân..." 
-                />
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <h3 className="font-bold text-lg flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2">
-                <MapPin size={20} className="text-indigo-600" /> Liên hệ & Thanh toán
-              </h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Địa chỉ</label>
-                  <input 
-                    type="text" 
-                    required 
-                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 bg-white placeholder:text-slate-400" 
-                    value={profile.address} 
-                    onChange={e => setProfile({...profile, address: e.target.value})} 
-                    placeholder="Địa chỉ nhận hàng/trụ sở..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Số điện thoại</label>
-                  <input 
-                    type="tel" 
-                    required 
-                    pattern="(03|05|07|08|09)+([0-9]{8})\b"
-                    title="Số điện thoại phải gồm 10 chữ số bắt đầu bằng 03, 05, 07, 08, 09"
-                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 bg-white placeholder:text-slate-400" 
-                    value={profile.phone} 
-                    onChange={e => setProfile({...profile, phone: e.target.value})} 
-                    placeholder="09xx..."
-                  />
-                </div>
-              </div>
-
-              {/* Chỉ hiện Bank cho KOL */}
-              {role === 'KOL' && (
-                  <div className="grid grid-cols-2 gap-4 mt-2">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1">Tên ngân hàng</label>
-                      <input 
-                        type="text" 
-                        className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 bg-white placeholder:text-slate-400" 
-                        value={profile.bankName} 
-                        onChange={e => setProfile({...profile, bankName: e.target.value})} 
-                        placeholder="VD: MB Bank"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1">Số tài khoản</label>
-                      <input 
-                        type="text" 
-                        className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 bg-white placeholder:text-slate-400" 
-                        value={profile.bankAccount} 
-                        onChange={e => setProfile({...profile, bankAccount: e.target.value})} 
-                        placeholder="xxxxxxxxx"
-                      />
-                    </div>
+              {/* Avatar Section */}
+              <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
+                <div className="relative group">
+                  <div className="h-28 w-28 rounded-full overflow-hidden border-4 border-gray-100 bg-gray-200 flex items-center justify-center">
+                    {previewAvatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={previewAvatar} alt="Avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      <UserIcon className="h-12 w-12 text-gray-400" />
+                    )}
                   </div>
-              )}
-            </div>
+                  <label 
+                    htmlFor="avatar-upload" 
+                    className="absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer"
+                  >
+                    <Camera className="h-8 w-8" />
+                  </label>
+                  <input 
+                    id="avatar-upload" 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleFileChange}
+                  />
+                </div>
+                
+                <div className="flex-1 text-center sm:text-left">
+                  <h3 className="text-lg font-medium text-gray-900">Ảnh đại diện</h3>
+                  <p className="text-sm text-gray-500 mt-1 mb-4">
+                    Cho phép JPG, GIF hoặc PNG. Tối đa 5MB.
+                  </p>
+                  <div className="flex gap-2 justify-center sm:justify-start">
+                    <label htmlFor="avatar-upload">
+                      <span className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+                        Thay đổi
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
 
-            <div className="col-span-full pt-6 border-t border-slate-100 flex justify-end">
-              <button 
-                type="submit" 
-                disabled={loading || uploading} 
-                className="bg-indigo-600 text-white font-bold py-3 px-8 rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg hover:shadow-indigo-500/30 disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {loading ? <Loader2 className="animate-spin"/> : <Save size={20} />} 
-                Lưu Thay Đổi
-              </button>
-            </div>
-          </form>
+              {/* Form Fields */}
+              <div className="border-t border-gray-100 pt-8 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                
+                <div className="sm:col-span-3">
+                  <Label htmlFor="fullName">Họ và tên</Label>
+                  <Input 
+                    id="fullName" 
+                    {...register('fullName')} 
+                    className={errors.fullName ? "border-red-500" : ""}
+                  />
+                  {errors.fullName && <p className="mt-1 text-sm text-red-500">{errors.fullName.message}</p>}
+                </div>
+
+                <div className="sm:col-span-3">
+                  <Label htmlFor="phone">Số điện thoại</Label>
+                  <Input 
+                    id="phone" 
+                    {...register('phone')} 
+                    placeholder="0912..."
+                  />
+                </div>
+
+                <div className="sm:col-span-6">
+                  <Label htmlFor="bio">Giới thiệu bản thân (Bio)</Label>
+                  <textarea
+                    id="bio"
+                    rows={4}
+                    {...register('bio')}
+                    className="flex w-full rounded-md border border-gray-300 bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                    placeholder="Hãy viết gì đó ấn tượng về bạn..."
+                  />
+                </div>
+
+                <div className="sm:col-span-6">
+                  <Label htmlFor="socialLink">Link Mạng xã hội</Label>
+                  <Input 
+                    id="socialLink" 
+                    {...register('socialLink')} 
+                    placeholder="https://facebook.com/..."
+                    className={errors.socialLink ? "border-red-500" : ""}
+                  />
+                  {errors.socialLink && <p className="mt-1 text-sm text-red-500">{errors.socialLink.message}</p>}
+                </div>
+              </div>
+
+              <div className="pt-5 border-t border-gray-100 flex justify-end">
+                <Button type="submit" disabled={isUploading || isUpdating} className="w-full sm:w-auto">
+                  {(isUploading || isUpdating) ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" /> Lưu thay đổi
+                    </>
+                  )}
+                </Button>
+              </div>
+
+            </form>
+          </div>
         </div>
-      </div>
-    </DashboardLayout>
+      </DashboardLayout>
+    </AuthGuard>
   );
 }

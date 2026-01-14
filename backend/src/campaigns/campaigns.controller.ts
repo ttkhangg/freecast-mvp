@@ -1,107 +1,146 @@
-import { Body, Controller, Get, Post, Param, UseGuards, Request, Patch, Query, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
 import { CampaignsService } from './campaigns.service';
-import { CreateCampaignDto } from './dto/create-campaign.dto';
-import { ApproveApplicationDto, SubmitContentDto } from './dto/booking.dto';
-import { AuthGuard } from '../auth/auth.guard';
+import { CreateCampaignDto, UpdateCampaignDto } from './dto/create-campaign.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/dto/auth.dto';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 
+@ApiTags('Campaigns')
 @Controller('campaigns')
 export class CampaignsController {
   constructor(private readonly campaignsService: CampaignsService) {}
 
-  // --- FIX GÓI 1: Tự động lấy Brand ID từ Token ---
-  @UseGuards(AuthGuard)
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRAND)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Tạo chiến dịch' })
   create(@Request() req, @Body() createCampaignDto: CreateCampaignDto) {
-    // Truyền userId (req.user.sub) xuống service để tự tìm Brand Profile
-    return this.campaignsService.create(req.user.sub, createCampaignDto);
+    return this.campaignsService.create(req.user.id, createCampaignDto);
+  }
+
+  @Get('brand/my-campaigns')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRAND)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy chiến dịch của Brand' })
+  findMyCampaigns(@Request() req) {
+    return this.campaignsService.findMyCampaigns(req.user.id);
   }
 
   @Get()
-  findAll(@Query('search') search?: string, @Query('platform') platform?: string) {
-    return this.campaignsService.findAll(search, platform);
-  }
-
-  @UseGuards(AuthGuard)
-  @Get('brand/my-campaigns')
-  getMyCampaigns(@Request() req) {
-    return this.campaignsService.getBrandCampaigns(req.user.sub);
-  }
-
-  @Get(':id/applicants')
-  getApplicants(@Param('id') id: string) {
-    return this.campaignsService.getApplicants(id);
-  }
-
-  @UseGuards(AuthGuard)
-  @Post(':id/apply')
-  apply(@Param('id') id: string, @Request() req) {
-    return this.campaignsService.apply(id, req.user.sub);
-  }
-
-  @UseGuards(AuthGuard)
-  @Get('my-jobs')
-  getMyJobs(@Request() req) {
-    return this.campaignsService.getMyJobs(req.user.sub);
-  }
-
-  @Get('application/:id')
-  getJobDetail(@Param('id') id: string) {
-    return this.campaignsService.getJobDetail(id);
-  }
-
-  @Patch('application/:id/approve')
-  approve(@Param('id') id: string, @Body() dto: ApproveApplicationDto) {
-    return this.campaignsService.approveApplication(id, dto);
-  }
-
-  @Patch('application/:id/receive')
-  receive(@Param('id') id: string) {
-    return this.campaignsService.confirmReceived(id);
-  }
-
-  @Patch('application/:id/submit')
-  submit(@Param('id') id: string, @Body() dto: SubmitContentDto) {
-    return this.campaignsService.submitContent(id, dto);
-  }
-
-  @Patch('application/:id/review')
-  review(@Param('id') id: string, @Body() body: { rating: number, review: string }) {
-    return this.campaignsService.reviewApplication(id, body.rating, body.review);
-  }
-
-  @Patch('application/:id/kol-review')
-  kolReview(@Param('id') id: string, @Body() body: { rating: number, review: string }) {
-    return this.campaignsService.kolReviewBrand(id, body.rating, body.review);
-  }
-
-  @UseGuards(AuthGuard)
-  @Patch('application/:id/cancel')
-  cancelApp(@Param('id') id: string, @Request() req) {
-    return this.campaignsService.cancelApplication(id, req.user.sub);
-  }
-
-  @UseGuards(AuthGuard)
-  @Patch(':id/close')
-  closeCampaign(@Param('id') id: string, @Request() req) {
-    return this.campaignsService.closeCampaign(id, req.user.sub);
-  }
-
-  // --- MỚI (PHASE 7.3): Sửa thông tin Campaign ---
-  @UseGuards(AuthGuard)
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateData: any, @Request() req) {
-    return this.campaignsService.update(id, req.user.sub, updateData);
-  }
-
-  // --- MỚI (PHASE 7.3): Xóa Campaign ---
-  @UseGuards(AuthGuard)
-  @Delete(':id')
-  remove(@Param('id') id: string, @Request() req) {
-    return this.campaignsService.remove(id, req.user.sub);
+  @ApiOperation({ summary: 'Lấy tất cả chiến dịch (Public)' })
+  findAll() {
+    return this.campaignsService.findAll();
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Xem chi tiết chiến dịch' })
   findOne(@Param('id') id: string) {
     return this.campaignsService.findOne(id);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRAND)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cập nhật chiến dịch' })
+  update(@Request() req, @Param('id') id: string, @Body() updateCampaignDto: UpdateCampaignDto) {
+    return this.campaignsService.update(id, req.user.id, updateCampaignDto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRAND, Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Xóa chiến dịch' })
+  remove(@Request() req, @Param('id') id: string) {
+    return this.campaignsService.remove(id, req.user.id);
+  }
+
+  // --- BOOKING & APPLICATION API ---
+
+  @Post(':id/apply')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.KOL)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'KOL Ứng tuyển' })
+  apply(@Request() req, @Param('id') id: string) {
+    return this.campaignsService.apply(id, req.user.id);
+  }
+
+  @Delete(':id/apply')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.KOL)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'KOL Huỷ Ứng tuyển' })
+  cancelApply(@Request() req, @Param('id') id: string) {
+    return this.campaignsService.cancelApplication(id, req.user.id);
+  }
+
+  @Patch('application/:id/approve')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRAND)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Duyệt đơn ứng tuyển' })
+  approveApplication(@Request() req, @Param('id') id: string) {
+    return this.campaignsService.approveApplication(id, req.user.id);
+  }
+
+  @Patch('application/:id/reject')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRAND)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Từ chối đơn ứng tuyển' })
+  rejectApplication(@Request() req, @Param('id') id: string) {
+    return this.campaignsService.rejectApplication(id, req.user.id);
+  }
+
+  @Get('application/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy chi tiết đơn (Kèm địa chỉ KOL)' })
+  getAppDetail(@Request() req, @Param('id') id: string) {
+    return this.campaignsService.getApplicationDetail(id, req.user.id);
+  }
+
+  @Patch('application/:id/tracking')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRAND)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Brand cập nhật mã vận đơn' })
+  @ApiBody({ schema: { properties: { trackingCode: { type: 'string' } } } })
+  updateTracking(@Request() req, @Param('id') id: string, @Body('trackingCode') code: string) {
+    return this.campaignsService.updateTracking(id, req.user.id, code);
+  }
+
+  @Patch('application/:id/receive')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.KOL)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'KOL xác nhận nhận hàng' })
+  confirmProduct(@Request() req, @Param('id') id: string) {
+    return this.campaignsService.confirmProductReceived(id, req.user.id);
+  }
+
+  @Patch('application/:id/submit')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.KOL)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'KOL nộp link bài đăng' })
+  @ApiBody({ schema: { properties: { link: { type: 'string' } } } })
+  submitWork(@Request() req, @Param('id') id: string, @Body('link') link: string) {
+    return this.campaignsService.submitWork(id, req.user.id, link);
+  }
+
+  @Patch('application/:id/complete')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRAND)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Brand hoàn tất đơn hàng' })
+  completeJob(@Request() req, @Param('id') id: string) {
+    return this.campaignsService.completeJob(id, req.user.id);
   }
 }

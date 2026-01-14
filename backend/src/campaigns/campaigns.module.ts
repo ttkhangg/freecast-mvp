@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { CampaignsService } from './campaigns.service';
 import { CampaignsController } from './campaigns.controller';
-import { PrismaModule } from '../prisma/prisma.module'; // <-- IMPORT PRISMA
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule], // <-- THÊM VÀO ĐÂY
+  imports: [PrismaModule],
   controllers: [CampaignsController],
   providers: [CampaignsService],
+  exports: [CampaignsService], // Export nếu ChatModule cần check campaign
 })
 export class CampaignsModule {}

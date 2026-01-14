@@ -1,20 +1,24 @@
 import { Controller, Get, Param, UseGuards, Request } from '@nestjs/common';
 import { ChatService } from './chat.service';
-import { AuthGuard } from '../auth/auth.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Chat')
 @Controller('chat')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
-  @Get(':applicationId')
-  getMessages(@Param('applicationId') applicationId: string) {
-    return this.chatService.getMessages(applicationId);
+  @Get('conversations')
+  @ApiOperation({ summary: 'Lấy danh sách các cuộc hội thoại' })
+  async getConversations(@Request() req) {
+    return this.chatService.getConversations(req.user.id);
   }
 
-  // --- API MỚI ---
-  @UseGuards(AuthGuard)
-  @Get('conversations/all')
-  getConversations(@Request() req) {
-    return this.chatService.getConversations(req.user.sub);
+  @Get(':applicationId')
+  @ApiOperation({ summary: 'Lấy lịch sử tin nhắn' })
+  async getMessages(@Request() req, @Param('applicationId') applicationId: string) {
+    return this.chatService.getMessages(req.user.id, applicationId);
   }
 }

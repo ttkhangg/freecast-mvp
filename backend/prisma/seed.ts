@@ -1,79 +1,73 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role, CampaignStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Đang khởi tạo dữ liệu mẫu...');
+  console.log('🌱 Starting Seeding...');
 
-  // 1. Tạo Brand User & Profile
-  const brandPassword = await bcrypt.hash('123456', 10);
-  const brandUser = await prisma.user.upsert({
-    where: { email: 'brand@demo.com' },
+  // 1. Hash Password
+  const salt = await bcrypt.genSalt(10);
+  const password = await bcrypt.hash('password123', salt);
+
+  // 2. Create Admin
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@freecast.com' },
     update: {},
     create: {
-      email: 'brand@demo.com',
-      password: brandPassword,
-      role: 'BRAND',
-      brandProfile: {
-        create: {
-          companyName: 'Samsung Vina',
-          industry: 'Technology',
-          description: 'Nhà sản xuất thiết bị điện tử hàng đầu.',
-          website: 'https://samsung.com',
-          address: 'Bitexco Financial Tower, Q1, TP.HCM',
-          phone: '1800588889'
-        }
-      }
+      email: 'admin@freecast.com',
+      password,
+      fullName: 'Super Admin',
+      role: Role.ADMIN, // Dùng Enum
+      isEmailVerified: true,
     },
-    include: { brandProfile: true } // Để lấy ID profile
   });
+  console.log(`Created Admin: ${admin.email}`);
 
-  console.log(`✅ Đã tạo Brand: ${brandUser.email}`);
-
-  // 2. Tạo KOL User & Profile
-  const kolPassword = await bcrypt.hash('123456', 10);
-  const kolUser = await prisma.user.upsert({
-    where: { email: 'kol@demo.com' },
+  // 3. Create Brand
+  const brand = await prisma.user.upsert({
+    where: { email: 'brand@tesla.com' },
     update: {},
     create: {
-      email: 'kol@demo.com',
-      password: kolPassword,
-      role: 'KOL',
-      kolProfile: {
-        create: {
-          fullName: 'Vinh Vật Vờ',
-          bio: 'Reviewer công nghệ số 1 Việt Nam',
-          phone: '0909000111',
-          address: 'Cầu Giấy, Hà Nội',
-          bankName: 'Techcombank',
-          bankAccount: '190333888999'
-        }
-      }
-    }
+      email: 'brand@tesla.com',
+      password,
+      fullName: 'Tesla Inc.',
+      role: Role.BRAND, // Dùng Enum
+      bio: 'We build cars and robots.',
+      isEmailVerified: true,
+    },
   });
+  console.log(`Created Brand: ${brand.email}`);
 
-  console.log(`✅ Đã tạo KOL: ${kolUser.email}`);
+  // 4. Create KOL
+  const kol = await prisma.user.upsert({
+    where: { email: 'kol@sontung.com' },
+    update: {},
+    create: {
+      email: 'kol@sontung.com',
+      password,
+      fullName: 'Son Tung MTP',
+      role: Role.KOL, // Dùng Enum
+      bio: 'Sky oi say oh yeah!',
+      isEmailVerified: true,
+    },
+  });
+  console.log(`Created KOL: ${kol.email}`);
 
-  // 3. Tạo Campaign (Gắn với Brand trên)
-  if (brandUser.brandProfile) {
-    const campaign = await prisma.campaign.create({
-      data: {
-        title: 'Review Galaxy S24 Ultra - Quyền năng AI',
-        description: 'Trải nghiệm các tính năng AI mới nhất trên Galaxy S24 Ultra. Yêu cầu quay video dọc, thời lượng > 1 phút.',
-        requirements: '- Quay video rõ nét\n- Nhắc đến tính năng Note Assist\n- Hashtag #GalaxyS24 #AI',
-        productName: 'Samsung Galaxy S24 Ultra',
-        productValue: '30.000.000 VNĐ',
-        platform: 'TikTok',
-        status: 'ACTIVE',
-        deadline: new Date('2024-12-31'),
-        brandId: brandUser.brandProfile.id
-      }
-    });
-    console.log(`✅ Đã tạo Campaign: ${campaign.title}`);
-  }
+  // 5. Create Campaign
+  const campaign = await prisma.campaign.create({
+    data: {
+      title: 'Review Tesla Cybertruck',
+      description: 'Need a cool KOL to drive our new truck.',
+      budget: 10000,
+      deadline: new Date('2026-12-31'),
+      status: CampaignStatus.OPEN, // Dùng Enum
+      brandId: brand.id,
+    },
+  });
+  console.log(`Created Campaign: ${campaign.title}`);
 
-  console.log('🏁 Hoàn tất seed dữ liệu!');
+  console.log('✅ Seeding Finished!');
 }
 
 main()

@@ -1,89 +1,120 @@
 'use client';
-import { useState } from 'react';
-import api from '@/utils/api';
-import Cookies from 'js-cookie';
-import { useRouter } from 'next/navigation';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useLogin } from '@/hooks/useAuth';
+import { useAuthStore } from '@/store/useAuthStore';
+import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const router = useRouter();
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [loading, setLoading] = useState(false);
+  
+  const { isAuthenticated, isHydrated } = useAuthStore();
+  const { mutate: login, isPending } = useLogin();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await api.post('/auth/login', formData);
-      Cookies.set('token', res.data.access_token);
-      Cookies.set('role', res.data.role);
-      router.push('/dashboard');
-    } catch (err) {
-      alert('Email hoặc mật khẩu không chính xác!');
-    } finally {
-      setLoading(false);
+  // GUEST GUARD: Chỉ redirect khi chắc chắn đã load xong VÀ đang logged in
+  useEffect(() => {
+    if (isHydrated && isAuthenticated) {
+      console.log('User is authenticated, redirecting to dashboard...');
+      router.replace('/dashboard');
     }
+  }, [isHydrated, isAuthenticated, router]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+    login({ email, password });
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:50px_50px]" />
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[120px]" />
-
-      {/* Back Button */}
-      <Link href="/" className="absolute top-8 left-8 text-slate-400 hover:text-white flex items-center gap-2 transition-colors z-20">
-        <ArrowLeft size={20} /> Trang chủ
-      </Link>
-
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="glass-card p-8 rounded-3xl shadow-2xl w-full max-w-md relative z-10"
-      >
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-white">Chào mừng trở lại!</h1>
-          <p className="text-slate-400 text-sm mt-1">Đăng nhập để quản lý chiến dịch</p>
+  // CHỈ HIỂN THỊ LOADING KHI:
+  // 1. Đã Hydrate xong VÀ Đã Login (Đang chờ redirect)
+  // Loại bỏ điều kiện !isHydrated để tránh treo form nếu hydration chậm
+  if (isHydrated && isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-10 w-10 animate-spin text-indigo-600" />
+          <p className="mt-2 text-sm text-gray-500">Đang chuyển hướng...</p>
         </div>
+      </div>
+    );
+  }
 
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div className="relative group">
-            <Mail className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={20} />
-            <input 
-              type="email" 
-              placeholder="Email đăng nhập" 
-              required 
-              className="w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 text-white outline-none transition-all placeholder:text-slate-600"
-              onChange={(e) => setFormData({...formData, email: e.target.value})} 
-            />
-          </div>
-          
-          <div className="relative group">
-            <Lock className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={20} />
-            <input 
-              type="password" 
-              placeholder="Mật khẩu" 
-              required 
-              className="w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 text-white outline-none transition-all placeholder:text-slate-600"
-              onChange={(e) => setFormData({...formData, password: e.target.value})} 
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            disabled={loading} 
-            className="w-full bg-white text-slate-950 py-4 rounded-xl font-bold hover:bg-indigo-50 transition-all shadow-lg hover:shadow-indigo-500/20 flex items-center justify-center gap-2 group disabled:opacity-50"
-          >
-            {loading ? 'Đang kiểm tra...' : 'Đăng Nhập'}
-            {!loading && <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />}
-          </button>
-        </form>
-
-        <p className="mt-8 text-center text-sm text-slate-500">
-          Chưa có tài khoản? <Link href="/register" className="text-indigo-400 font-bold hover:underline">Đăng ký ngay</Link>
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center py-12 sm:px-6 lg:px-8 bg-gray-50">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          Đăng nhập vào FreeCast
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          Hoặc{' '}
+          <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+            đăng ký tài khoản mới
+          </Link>
         </p>
-      </motion.div>
+      </div>
+
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Email
+              </label>
+              <div className="mt-1">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Mật khẩu
+              </label>
+              <div className="mt-1">
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={isPending}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  'Đăng nhập'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,275 +1,202 @@
 'use client';
-import { useEffect, useState } from 'react';
-import api from '@/utils/api';
-import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { Check, X, ArrowLeft, Star, Filter, Search, ExternalLink, Loader2, Eye, MessageSquare, Truck, Lock } from 'lucide-react';
-import Link from 'next/link';
-import ReviewModal from '@/components/ReviewModal';
-import ChatBox from '@/components/ChatBox';
-import { jwtDecode } from "jwt-decode";
-import Cookies from 'js-cookie';
+
+import { useParams, useRouter } from 'next/navigation';
+import { useCampaignDetail, useApproveApplication, useRejectApplication } from '@/hooks/useCampaigns';
 import DashboardLayout from '@/components/DashboardLayout';
-import VerifiedBadge from '@/components/VerifiedBadge';
+import AuthGuard from '@/components/AuthGuard';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+// Added 'Users' to the import list below
+import { Loader2, ArrowLeft, Check, X, MessageSquare, User, Briefcase, Calendar, DollarSign, Users } from 'lucide-react';
+import { CampaignStatus } from '@/types';
 
-export default function ManageApplicants() {
-  const { id } = useParams();
-  const searchParams = useSearchParams();
-  const router = useRouter(); 
-  
-  const [applicants, setApplicants] = useState<any[]>([]);
-  const [loadingApprove, setLoadingApprove] = useState<string | null>(null);
-  const [userId, setUserId] = useState('');
-  
-  const [filterFollower, setFilterFollower] = useState('ALL');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [reviewingAppId, setReviewingAppId] = useState<string | null>(null);
-  const [chattingAppId, setChattingAppId] = useState<string | null>(null);
+export default function BrandCampaignManagePage() {
+  const params = useParams();
+  const id = params?.id as string;
+  const router = useRouter();
 
-  const fetchApplicants = () => {
-    api.get(`/campaigns/${id}/applicants`).then(res => setApplicants(res.data));
-  };
+  // Hooks
+  const { data: campaign, isLoading, error } = useCampaignDetail(id);
+  const { mutate: approve, isPending: isApproving } = useApproveApplication();
+  const { mutate: reject, isPending: isRejecting } = useRejectApplication();
 
-  useEffect(() => { 
-    const token = Cookies.get('token');
-    if (token) {
-        try {
-            const decoded: any = jwtDecode(token);
-            setUserId(decoded.sub);
-        } catch (error) {}
-    }
-    fetchApplicants(); 
-  }, [id]);
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex h-screen items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
-  useEffect(() => {
-    const autoChatId = searchParams.get('chatAppId');
-    if (autoChatId) setChattingAppId(autoChatId);
-  }, [searchParams]);
+  if (error || !campaign) {
+    return (
+      <DashboardLayout>
+        <div className="flex h-screen items-center justify-center flex-col">
+          <h2 className="text-xl font-bold text-gray-800">Không tìm thấy chiến dịch</h2>
+          <Button variant="link" onClick={() => router.push('/brand/campaigns')} className="mt-4">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Quay lại danh sách
+          </Button>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
-  // LOGIC SECURE FLOW: Bước 1 - Duyệt đơn (Chưa có vận đơn)
-  const handleApprove = async (appId: string) => {
-    if(!confirm("Xác nhận duyệt ứng viên này? Sau khi duyệt, bạn sẽ thấy thông tin liên hệ để gửi hàng.")) return;
-    
-    setLoadingApprove(appId);
-    try {
-      // Gửi request không có shippingCode -> Status sẽ là APPROVED
-      await api.patch(`/campaigns/application/${appId}/approve`, {});
-      fetchApplicants();
-    } catch (err) {
-      alert("Lỗi khi duyệt");
-    } finally {
-      setLoadingApprove(null);
-    }
-  };
-
-  // LOGIC SECURE FLOW: Bước 2 - Cập nhật vận đơn (Sau khi đã duyệt)
-  const handleUpdateShipping = async (appId: string) => {
-    const code = prompt("Nhập mã vận đơn (VD: GHTK123...):");
-    if (!code) return;
-    
-    setLoadingApprove(appId);
-    try {
-      await api.patch(`/campaigns/application/${appId}/approve`, {
-        shippingCode: code,
-        carrier: 'GHTK' // Demo, thực tế có thể cho chọn hãng
-      });
-      alert("Đã cập nhật vận đơn & Thông báo cho KOL!");
-      fetchApplicants();
-    } catch (err) { alert("Lỗi cập nhật"); }
-    finally { setLoadingApprove(null); }
-  };
-
-  const filteredApplicants = applicants.filter(app => {
-    const matchName = app.kol.fullName.toLowerCase().includes(searchTerm.toLowerCase());
-    let matchFollower = true;
-    if (filterFollower === '>10k') matchFollower = app.kol.followers >= 10000;
-    if (filterFollower === '>50k') matchFollower = app.kol.followers >= 50000;
-    if (filterFollower === '>100k') matchFollower = app.kol.followers >= 100000;
-    return matchName && matchFollower;
-  });
+  // Helper để lấy số lượng ứng viên theo trạng thái
+  const pendingCount = campaign.applications?.filter((a: any) => a.status === 'PENDING').length || 0;
+  const approvedCount = campaign.applications?.filter((a: any) => a.status === 'APPROVED').length || 0;
 
   return (
-    <DashboardLayout>
-      <div className="max-w-6xl mx-auto">
-        <Link href="/brand/campaigns" className="inline-flex items-center text-slate-500 hover:text-indigo-600 mb-6 font-medium transition-colors">
-          <ArrowLeft size={20} className="mr-2"/> Quay lại danh sách
-        </Link>
-        
-        <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Danh sách ứng viên</h1>
-                <p className="text-slate-500 text-sm mt-1">Tổng cộng: {filteredApplicants.length} KOL phù hợp</p>
-            </div>
+    <AuthGuard allowedRoles={['BRAND']}>
+      <DashboardLayout>
+        <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+          
+          {/* Header Navigation */}
+          <div className="mb-6">
+            <button 
+              onClick={() => router.push('/brand/campaigns')} 
+              className="flex items-center text-sm text-gray-500 hover:text-indigo-600 transition-colors mb-4"
+            >
+              <ArrowLeft className="mr-1 h-4 w-4" /> Quay lại danh sách
+            </button>
             
-            <div className="flex gap-3 bg-white p-2 rounded-xl shadow-sm border border-slate-100">
-                <div className="relative">
-                    <Search size={16} className="absolute left-3 top-3 text-slate-400"/>
-                    <input 
-                        type="text" 
-                        placeholder="Tìm tên KOL..." 
-                        className="pl-9 pr-4 py-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 w-48 text-slate-900"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-bold text-gray-900">{campaign.title}</h1>
+                  <Badge variant={campaign.status === CampaignStatus.OPEN ? 'success' : 'secondary'}>
+                    {campaign.status}
+                  </Badge>
                 </div>
-                <div className="relative">
-                    <Filter size={16} className="absolute left-3 top-3 text-slate-400"/>
-                    <select 
-                        className="pl-9 pr-8 py-2 bg-slate-50 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer text-slate-900"
-                        value={filterFollower}
-                        onChange={(e) => setFilterFollower(e.target.value)}
-                    >
-                        <option value="ALL">Tất cả Follower</option>
-                        <option value=">10k">&gt; 10k Followers</option>
-                        <option value=">50k">&gt; 50k Followers</option>
-                        <option value=">100k">&gt; 100k Followers</option>
-                    </select>
+                <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                  <span className="flex items-center"><DollarSign className="w-4 h-4 mr-1"/> {new Intl.NumberFormat('vi-VN').format(campaign.budget)} đ</span>
+                  <span className="flex items-center"><Calendar className="w-4 h-4 mr-1"/> Hạn: {new Date(campaign.deadline).toLocaleDateString('vi-VN')}</span>
                 </div>
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" size="sm" onClick={() => router.push(`/campaigns/${id}`)}>
+                  Xem bài đăng công khai
+                </Button>
+                {/* Tính năng edit sẽ làm sau */}
+                <Button variant="secondary" size="sm">Chỉnh sửa</Button> 
+              </div>
             </div>
-        </div>
-        
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-8">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr>
-                <th className="p-4 font-bold text-slate-600 text-sm uppercase">Thông tin KOL</th>
-                <th className="p-4 font-bold text-slate-600 text-sm uppercase">Trạng thái</th>
-                <th className="p-4 font-bold text-slate-600 text-sm uppercase text-right">Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredApplicants.map(app => (
-                <tr key={app.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
-                  <td className="p-4 align-top max-w-[300px]">
-                      <div className="flex items-start gap-3">
-                         <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-slate-300">
-                            {app.kol.avatar ? <img src={app.kol.avatar} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold">{app.kol.fullName[0]}</div>}
-                         </div>
-                         <div>
-                            <div className="font-bold text-slate-900 flex items-center gap-1">
-                                {app.kol.fullName}
-                                {app.kol.user?.isVerified && <VerifiedBadge />}
+          </div>
+
+          {/* Stats Bar */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <p className="text-sm font-medium text-gray-500">Tổng ứng viên</p>
+              <p className="text-2xl font-bold text-gray-900">{campaign.applications?.length || 0}</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <p className="text-sm font-medium text-gray-500">Đang chờ duyệt</p>
+              <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <p className="text-sm font-medium text-gray-500">Đã tuyển</p>
+              <p className="text-2xl font-bold text-green-600">{approvedCount}</p>
+            </div>
+          </div>
+
+          {/* Applicants List */}
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center">
+              <Users className="mr-2 h-5 w-5 text-indigo-600" />
+              Danh sách ứng viên
+            </h2>
+
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
+              {campaign.applications?.map((app: any) => (
+                <div 
+                  key={app.id} 
+                  className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col"
+                >
+                  <div className="p-6 flex-1">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center">
+                        <div className="h-12 w-12 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
+                          {app.kol.avatar ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={app.kol.avatar} alt={app.kol.fullName} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center text-gray-400">
+                              <User className="h-6 w-6" />
                             </div>
-                            <div className="text-xs text-slate-500 mt-0.5">{app.kol.followers.toLocaleString()} followers</div>
-                            {app.kol.socialLink && (
-                                <a href={app.kol.socialLink} target="_blank" className="text-xs text-indigo-500 hover:underline flex items-center gap-1 mt-1"><ExternalLink size={10}/> Kênh review</a>
-                            )}
-                            
-                            {/* --- SECURE FLOW: Ẩn thông tin nếu chưa duyệt --- */}
-                            {['APPROVED', 'SHIPPING', 'RECEIVED', 'SUBMITTED', 'COMPLETED'].includes(app.status) ? (
-                                <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-100 text-xs text-slate-700">
-                                    <p className="flex items-center gap-1"><span className="font-bold">SĐT:</span> {app.kol.phone}</p>
-                                    <p className="flex items-center gap-1 mt-1"><span className="font-bold">Đ/C:</span> {app.kol.address}</p>
-                                </div>
-                            ) : (
-                                <div className="mt-2 text-xs text-slate-400 italic flex items-center gap-1">
-                                    <Lock size={10}/> Thông tin liên hệ bị ẩn
-                                </div>
-                            )}
-                         </div>
+                          )}
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-base font-bold text-gray-900">{app.kol.fullName}</h3>
+                          <div className="flex items-center text-xs text-gray-500 mt-0.5">
+                            <span>{app.kol.email}</span>
+                            {app.kol.phone && <span className="mx-1">• {app.kol.phone}</span>}
+                          </div>
+                        </div>
                       </div>
-                  </td>
-                  <td className="p-4 align-top">
-                    <span className={`px-2 py-1 rounded text-xs font-bold border inline-block mb-2 ${
-                      app.status === 'PENDING' ? 'bg-slate-100 text-slate-600 border-slate-200' : 
-                      app.status === 'APPROVED' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                      'bg-green-50 text-green-600 border-green-100'
-                    }`}>
-                      {app.status}
-                    </span>
-                    {app.shippingCode && <div className="text-[10px] text-slate-500 font-mono bg-slate-100 p-1 rounded border border-slate-200">
-                        <Truck size={10} className="inline mr-1"/>{app.shippingCode}
-                    </div>}
-                  </td>
-                  <td className="p-4 text-right align-top">
-                    <div className="flex justify-end gap-2 flex-wrap">
-                        {/* 1. Nút Duyệt (Chỉ khi Pending) */}
-                        {app.status === 'PENDING' && (
-                            <button 
-                                onClick={() => handleApprove(app.id)} 
-                                disabled={loadingApprove === app.id} 
-                                className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-xs shadow-sm flex items-center gap-1"
-                            >
-                                {loadingApprove === app.id ? <Loader2 size={14} className="animate-spin"/> : <Check size={14}/>} Duyệt
-                            </button>
-                        )}
-
-                        {/* 2. Nút Giao hàng (Khi đã Duyệt) */}
-                        {app.status === 'APPROVED' && (
-                            <button 
-                                onClick={() => handleUpdateShipping(app.id)} 
-                                disabled={loadingApprove === app.id} 
-                                className="px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-bold text-xs shadow-sm flex items-center gap-1"
-                            >
-                                <Truck size={14}/> Giao hàng
-                            </button>
-                        )}
-                        
-                        {/* 3. Nút Chat (Khi đã duyệt trở đi) */}
-                        {['APPROVED', 'SHIPPING', 'RECEIVED', 'SUBMITTED', 'COMPLETED'].includes(app.status) && (
-                            <button 
-                                onClick={() => setChattingAppId(app.id)} 
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors bg-white border border-slate-200" 
-                                title="Chat với KOL"
-                            >
-                                <MessageSquare size={16} />
-                            </button>
-                        )}
-
-                        {/* 4. Nút Nghiệm thu (Khi đã nộp bài) */}
-                        {app.status === 'SUBMITTED' && (
-                             <button 
-                                onClick={() => setReviewingAppId(app.id)} 
-                                className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-xs shadow-sm flex items-center gap-1"
-                            >
-                                <Star size={12} className="fill-white"/> Nghiệm thu
-                            </button>
-                        )}
-                        
-                        {/* 5. Nút Xem chi tiết (Luôn hiện nếu đã duyệt) */}
-                        {['APPROVED', 'SHIPPING', 'RECEIVED', 'SUBMITTED', 'COMPLETED'].includes(app.status) && (
-                             <Link href={`/my-jobs/${app.id}`} target="_blank" className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors" title="Xem chi tiết đơn">
-                                <Eye size={16} />
-                             </Link>
-                        )}
+                      <Badge variant={
+                        app.status === 'PENDING' ? 'warning' : 
+                        app.status === 'APPROVED' ? 'success' : 'destructive'
+                      }>
+                        {app.status === 'PENDING' ? 'Chờ duyệt' : 
+                         app.status === 'APPROVED' ? 'Đã nhận' : 'Từ chối'}
+                      </Badge>
                     </div>
-                  </td>
-                </tr>
-              ))}
-              {applicants.length === 0 && (
-                  <tr><td colSpan={4} className="p-8 text-center text-slate-400">Chưa có ứng viên nào.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    
+                    <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600 mb-4 border border-gray-100">
+                      <p className="font-medium text-gray-700 text-xs uppercase tracking-wide mb-1">Lời nhắn:</p>
+                      <p className="italic">"{app.coverLetter || 'Tôi rất mong muốn được hợp tác trong dự án này.'}"</p> 
+                    </div>
+                  </div>
 
-        {chattingAppId && (
-            <div className="fixed bottom-4 right-4 w-96 z-50 shadow-2xl animate-fade-in-up">
-                <div className="relative">
-                    <button 
-                        onClick={() => { setChattingAppId(null); router.replace(`/brand/campaigns/${id}`); }} 
-                        className="absolute -top-2 -right-2 bg-slate-900 text-white rounded-full p-1 z-10 hover:bg-red-600 transition-colors shadow-md"
-                    >
-                        <X size={16}/>
-                    </button>
-                    {/* Truyền Partner Name & Avatar vào ChatBox */}
-                    <ChatBox 
-                        applicationId={chattingAppId} 
-                        currentUserId={userId} 
-                        partnerName={applicants.find(a => a.id === chattingAppId)?.kol.fullName || 'KOL'} 
-                        partnerAvatar={applicants.find(a => a.id === chattingAppId)?.kol.avatar}
-                    />
+                  {/* Action Footer */}
+                  <div className="bg-gray-50/80 px-6 py-4 border-t border-gray-100 flex gap-3">
+                    {app.status === 'PENDING' && (
+                      <>
+                        <Button 
+                          onClick={() => approve(app.id)} 
+                          disabled={isApproving || isRejecting} 
+                          className="flex-1 bg-green-600 hover:bg-green-700" 
+                          size="sm"
+                        >
+                          <Check className="mr-1.5 h-4 w-4" /> Duyệt
+                        </Button>
+                        <Button 
+                          onClick={() => reject(app.id)} 
+                          disabled={isApproving || isRejecting} 
+                          variant="destructive" 
+                          size="sm" 
+                          className="flex-1"
+                        >
+                          <X className="mr-1.5 h-4 w-4" /> Từ chối
+                        </Button>
+                      </>
+                    )}
+                    
+                    {app.status === 'APPROVED' && (
+                      <Button variant="outline" size="sm" className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                        <MessageSquare className="mr-2 h-4 w-4" /> Nhắn tin trao đổi
+                      </Button>
+                    )}
+
+                    {app.status === 'REJECTED' && (
+                       <p className="text-xs text-center w-full text-gray-400 py-2">Đã từ chối hồ sơ này</p>
+                    )}
+                  </div>
                 </div>
-            </div>
-        )}
-      </div>
+              ))}
 
-      {reviewingAppId && (
-        <ReviewModal 
-          applicationId={reviewingAppId} 
-          onClose={() => setReviewingAppId(null)} 
-          onSuccess={() => { setReviewingAppId(null); fetchApplicants(); }} 
-        />
-      )}
-    </DashboardLayout>
+              {(!campaign.applications || campaign.applications.length === 0) && (
+                <div className="col-span-full flex flex-col items-center justify-center py-16 text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                  <Briefcase className="h-10 w-10 text-gray-300 mb-2" />
+                  <p>Chưa có ai ứng tuyển.</p>
+                  <p className="text-sm">Hãy kiên nhẫn chờ đợi thêm nhé!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    </AuthGuard>
   );
 }

@@ -1,105 +1,141 @@
 'use client';
-import { useEffect, useState } from 'react';
-import api from '@/utils/api';
+
+import { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import Link from 'next/link';
-import { MessageSquare, User, Building2, Loader2, ArrowRight } from 'lucide-react';
-import Cookies from 'js-cookie';
+import AuthGuard from '@/components/AuthGuard';
+import { useConversations, useChatMessages, useChatSocket } from '@/hooks/useChat';
+import { useAuthStore } from '@/store/useAuthStore';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Loader2, Send, MessageSquare } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Role } from '@/types';
 
 export default function MessagesPage() {
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [role, setRole] = useState('');
-  const [loading, setLoading] = useState(true);
-
+  const { user } = useAuthStore();
+  const { data: conversations, isLoading: loadingConv } = useConversations();
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  
   useEffect(() => {
-    setRole(Cookies.get('role') || '');
-    api.get('/chat/conversations/all')
-       .then(res => setConversations(res.data))
-       .catch(console.error)
-       .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return (
-    <DashboardLayout>
-       <div className="flex items-center justify-center h-64">
-         <Loader2 className="animate-spin text-indigo-600 h-8 w-8"/>
-       </div>
-    </DashboardLayout>
-  );
+    if (conversations && conversations.length > 0 && !selectedConvId) {
+      setSelectedConvId(conversations[0].id);
+    }
+  }, [conversations, selectedConvId]);
 
   return (
-    <DashboardLayout>
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6 text-slate-900 flex items-center gap-2">
-            <MessageSquare className="text-indigo-600"/> Tin nhắn
-        </h1>
-        
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          {conversations.length === 0 ? (
-            <div className="p-12 text-center text-slate-400">
-                <MessageSquare size={48} className="mx-auto mb-3 opacity-20"/>
-                <p>Chưa có cuộc hội thoại nào.</p>
-                <p className="text-xs mt-1">Chat sẽ xuất hiện khi đơn hàng được duyệt.</p>
+    <AuthGuard>
+      <DashboardLayout>
+        <div className="h-[calc(100vh-100px)] flex flex-col md:flex-row bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+          
+          {/* List Conversations */}
+          <div className="w-full md:w-1/3 border-r border-gray-200 flex flex-col">
+            <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <h2 className="font-bold text-gray-700">Tin nhắn</h2>
             </div>
-          ) : (
-            <div className="divide-y divide-slate-50">
-              {conversations.map(conv => {
-                // Xác định tên và avatar đối phương
-                const isBrandView = role === 'BRAND';
-                const partnerName = isBrandView ? conv.kol.fullName : conv.campaign.brand.companyName;
-                const partnerAvatar = isBrandView ? conv.kol.avatar : conv.campaign.brand.logo;
-                const lastMsg = conv.messages[0];
-                
-                return (
-                  <Link 
-                      href={isBrandView ? `/brand/campaigns/${conv.campaignId}?chatAppId=${conv.id}` : `/my-jobs/${conv.id}`} 
-                      key={conv.id} 
-                      className="block p-5 hover:bg-slate-50 transition-colors group"
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Avatar hiển thị */}
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 shadow-sm overflow-hidden bg-slate-100 border border-slate-200">
-                         {partnerAvatar ? (
-                             <img src={partnerAvatar} alt={partnerName} className="w-full h-full object-cover" />
-                         ) : (
-                             <span className={isBrandView ? 'text-pink-600' : 'text-indigo-600'}>
-                                {isBrandView ? <User size={24}/> : <Building2 size={24}/>}
-                             </span>
-                         )}
+            <div className="flex-1 overflow-y-auto">
+              {loadingConv ? (
+                <div className="flex justify-center p-4"><Loader2 className="animate-spin text-indigo-600"/></div>
+              ) : conversations?.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 text-sm">Chưa có cuộc trò chuyện nào.</div>
+              ) : (
+                conversations?.map((conv) => {
+                  const isMeBrand = user?.role === Role.BRAND;
+                  const partnerName = isMeBrand ? conv.kol.fullName : "Brand";
+                  const partnerAvatar = isMeBrand ? conv.kol.avatar : null;
+                  const lastMsg = conv.messages?.[0]?.content || "Bắt đầu cuộc trò chuyện";
+
+                  return (
+                    <div 
+                      key={conv.id}
+                      onClick={() => setSelectedConvId(conv.id)}
+                      className={cn(
+                        "p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors",
+                        selectedConvId === conv.id ? "bg-indigo-50 border-l-4 border-l-indigo-600" : ""
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                           {partnerAvatar ? (
+                             // eslint-disable-next-line @next/next/no-img-element
+                             <img src={partnerAvatar} alt="" className="h-full w-full object-cover"/>
+                           ) : (
+                             <div className="h-full w-full flex items-center justify-center font-bold text-gray-500">
+                               {partnerName.charAt(0)}
+                             </div>
+                           )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{partnerName}</p>
+                          <p className="text-xs text-gray-500 truncate font-semibold">{conv.campaign.title}</p>
+                          <p className="text-xs text-gray-400 truncate mt-1">{lastMsg}</p>
+                        </div>
                       </div>
-                      
-                      <div className="flex-1 min-w-0">
-                         <div className="flex justify-between items-center mb-1">
-                            <h4 className="font-bold text-slate-900 truncate group-hover:text-indigo-700 transition-colors text-lg">
-                              {partnerName}
-                            </h4>
-                            <span className="text-xs text-slate-400 whitespace-nowrap ml-2">
-                                {new Date(conv.updatedAt).toLocaleDateString('vi-VN')}
-                            </span>
-                         </div>
-                         
-                         <div className="flex items-center gap-2 mb-1">
-                           <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-200 uppercase truncate max-w-[200px]">
-                              {conv.campaign.title}
-                           </span>
-                         </div>
-                         
-                         <p className={`text-sm truncate ${lastMsg ? 'text-slate-600' : 'text-slate-400 italic'}`}>
-                            {lastMsg 
-                                ? (lastMsg.senderId !== 'ME' ? '' : 'Bạn: ') + lastMsg.content 
-                                : 'Chưa có tin nhắn nào. Bắt đầu trò chuyện ngay!'}
-                         </p>
-                      </div>
-                      
-                      <ArrowRight size={20} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all"/>
                     </div>
-                  </Link>
-                );
-              })}
+                  )
+                })
+              )}
             </div>
-          )}
+          </div>
+
+          {/* Chat Box */}
+          <div className="flex-1 flex flex-col bg-white">
+            {selectedConvId ? (
+              <ChatWindow applicationId={selectedConvId} currentUserId={user?.id || ''} />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-400 flex-col">
+                <MessageSquare className="h-16 w-16 mb-4 opacity-20" />
+                <p>Chọn một cuộc hội thoại để bắt đầu</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </DashboardLayout>
+      </DashboardLayout>
+    </AuthGuard>
   );
+}
+
+function ChatWindow({ applicationId, currentUserId }: { applicationId: string, currentUserId: string }) {
+  const { data: messages, isLoading } = useChatMessages(applicationId);
+  const { sendMessage } = useChatSocket(applicationId);
+  const [input, setInput] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    sendMessage(input);
+    setInput('');
+  };
+
+  if (isLoading) return <div className="flex-1 flex items-center justify-center"><Loader2 className="animate-spin"/></div>;
+
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50" ref={scrollRef}>
+        {messages?.map((msg) => {
+          const isMe = msg.senderId === currentUserId;
+          return (
+            <div key={msg.id} className={cn("flex", isMe ? "justify-end" : "justify-start")}>
+              <div className={cn("max-w-[70%] rounded-lg px-4 py-2 text-sm shadow-sm", isMe ? "bg-indigo-600 text-white" : "bg-white text-gray-800 border border-gray-200")}>
+                <p>{msg.content}</p>
+                <p className={cn("text-[10px] mt-1 text-right", isMe ? "text-indigo-200" : "text-gray-400")}>
+                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="p-4 border-t border-gray-200 bg-white">
+        <form onSubmit={handleSend} className="flex gap-2">
+          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Nhập tin nhắn..." className="flex-1" />
+          <Button type="submit" size="icon" disabled={!input.trim()}><Send className="h-4 w-4" /></Button>
+        </form>
+      </div>
+    </>
+  )
 }

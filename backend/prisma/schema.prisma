@@ -1,4 +1,3 @@
-// 1. Cấu hình kết nối
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 2. Enum trạng thái
 enum Role {
   ADMIN
   BRAND
@@ -17,155 +15,134 @@ enum Role {
 
 enum CampaignStatus {
   DRAFT
-  ACTIVE
-  LOCKED
+  OPEN
+  PAUSED
+  CLOSED
   COMPLETED
-  CANCELLED
 }
 
 enum ApplicationStatus {
   PENDING
   APPROVED
-  SHIPPING
-  RECEIVED
-  SUBMITTED
-  COMPLETED
-  PAID
   REJECTED
+  COMPLETED
+  CANCELLED
 }
 
-// 3. Models
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  password      String
-  role          Role      @default(BRAND)
-  isVerified    Boolean   @default(false)
-  isBanned      Boolean   @default(false) // NEW: Cờ chặn đăng nhập vĩnh viễn (Tech Debt #4)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(uuid())
+  email           String    @unique
+  password        String
+  fullName        String?   @map("full_name")
+  role            Role      @default(KOL)
+  avatar          String?
+  bio             String?
+  phone           String?
+  address         String?   // NEW: Địa chỉ nhận hàng
+  socialLink      String?   @map("social_link")
+  isEmailVerified Boolean   @default(false) @map("is_email_verified")
+  isBanned        Boolean   @default(false) @map("is_banned")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  brandProfile  BrandProfile?
-  kolProfile    KolProfile?
-  notifications Notification[]
-  messages      Message[]
-}
+  campaigns       Campaign[]
+  applications    Application[]
+  reviewsWritten  Review[]      @relation("ReviewAuthor")
+  reviewsReceived Review[]      @relation("ReviewTarget")
+  notifications   Notification[]
+  sentMessages    ChatMessage[] @relation("SentMessages")
 
-// Model Thông báo
-model Notification {
-  id        String   @id @default(uuid())
-  userId    String   // Người nhận thông báo
-  title     String
-  message   String
-  isRead    Boolean  @default(false)
-  link      String?  // Link đích khi bấm vào
-  createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id])
-}
-
-model BrandProfile {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  companyName String
-  logo        String?
-  website     String?
-  industry    String?
-  description String?
-  taxCode     String?
-  address     String?
-  phone       String?
-  
-  user        User     @relation(fields: [userId], references: [id])
-  campaigns   Campaign[]
-}
-
-model KolProfile {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  fullName    String
-  avatar      String?
-  bio         String?
-  categories  String[]
-  platforms   Json?
-  followers   Int      @default(0)
-  
-  // Thông tin liên hệ & Thanh toán
-  phone       String?
-  socialLink  String?  // Link kênh chính (Tech Debt #9)
-  address     String?
-  city        String?
-  bankName    String?
-  bankAccount String?
-  
-  user        User     @relation(fields: [userId], references: [id])
-  applications Application[]
+  @@map("users")
+  @@index([email])
 }
 
 model Campaign {
-  id            String          @id @default(uuid())
-  brandId       String
-  title         String
-  description   String          @db.Text
-  productName   String
-  productImage  String?
-  productValue  String
-  requirements  String          @db.Text
-  platform      String
-  status        CampaignStatus  @default(DRAFT)
-  deadline      DateTime?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id          String         @id @default(uuid())
+  title       String
+  description String
+  requirements String?
+  budget      Float
+  deadline    DateTime?
+  status      CampaignStatus @default(OPEN)
+  
+  brandId     String         @map("brand_id")
+  brand       User           @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
-  brand         BrandProfile    @relation(fields: [brandId], references: [id])
-  applications  Application[]
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  applications Application[]
+
+  @@map("campaigns")
+  @@index([brandId])
 }
 
 model Application {
-  id            String            @id @default(uuid())
-  campaignId    String
-  kolId         String
-  status        ApplicationStatus @default(PENDING)
+  id          String            @id @default(uuid())
+  coverLetter String?           @map("cover_letter")
+  price       Float?
+  status      ApplicationStatus @default(PENDING)
+
+  // --- NEW FIELDS FOR BOOKING FLOW ---
+  trackingCode     String?   @map("tracking_code") // Mã vận đơn
+  isProductReceived Boolean  @default(false) @map("is_product_received") // KOL xác nhận đã nhận hàng
+  submissionLink   String?   @map("submission_link") // Link bài đăng của KOL
   
-  // Logistics
-  shippingCode  String?
-  carrier       String?
-  
-  // Submission
-  contentLink   String?
-  submitNote    String?
-  
-  // Timestamps
-  approvedAt    DateTime?
-  shippedAt     DateTime?
-  receivedAt    DateTime?
-  submittedAt   DateTime?
-  completedAt   DateTime?
+  campaignId  String            @map("campaign_id")
+  campaign    Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
-  // Review (Đánh giá 2 chiều)
-  rating        Int?              // Brand đánh giá KOL
-  review        String?
-  kolRating     Int?              // KOL đánh giá Brand
-  kolReview     String?
+  kolId       String            @map("kol_id")
+  kol         User              @relation(fields: [kolId], references: [id], onDelete: Cascade)
 
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
 
-  campaign      Campaign          @relation(fields: [campaignId], references: [id])
-  kol           KolProfile        @relation(fields: [kolId], references: [id])
-  messages      Message[]
+  review      Review?
+  messages    ChatMessage[]
 
+  @@map("applications")
   @@unique([campaignId, kolId])
 }
 
-// Model Tin nhắn
-model Message {
-  id            String      @id @default(uuid())
-  content       String      @db.Text
-  senderId      String
-  applicationId String
-  createdAt     DateTime    @default(now())
+model Review {
+  id            String   @id @default(uuid())
+  rating        Int
+  comment       String?
+  
+  applicationId String   @unique @map("application_id")
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
-  sender        User        @relation(fields: [senderId], references: [id])
-  application   Application @relation(fields: [applicationId], references: [id])
+  authorId      String   @map("author_id")
+  author        User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+
+  targetId      String   @map("target_id")
+  target        User     @relation("ReviewTarget", fields: [targetId], references: [id])
+
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("reviews")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  content   String
+  isRead    Boolean  @default(false) @map("is_read")
+  type      String?
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+model ChatMessage {
+  id            String      @id @default(uuid())
+  content       String
+  senderId      String      @map("sender_id")
+  sender        User        @relation("SentMessages", fields: [senderId], references: [id])
+  applicationId String      @map("application_id")
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@map("chat_messages")
 }

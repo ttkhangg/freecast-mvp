@@ -1,111 +1,157 @@
-import { Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
-import { UpdateBrandProfileDto, UpdateKolProfileDto } from './dto/update-profile.dto';
+import { PrismaService } from '../prisma/prisma.service';
+import { RegisterDto, LoginDto, AuthResponseDto } from './dto/auth.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService, private jwtService: JwtService) {}
+  private readonly logger = new Logger(AuthService.name);
 
-  async register(dto: RegisterDto) {
-    const userExists = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (userExists) throw new BadRequestException('Email đã tồn tại');
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+  async register(dto: RegisterDto): Promise<AuthResponseDto> {
+    this.logger.log(`Registering new user: ${dto.email}`);
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (existingUser) {
+      this.logger.warn(`Registration failed: Email ${dto.email} already exists`);
+      throw new ConflictException('Email này đã được sử dụng');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(dto.password, salt);
+
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
         password: hashedPassword,
+        fullName: dto.fullName,
         role: dto.role,
-        brandProfile: dto.role === 'BRAND' ? { create: { companyName: dto.name } } : undefined,
-        kolProfile: dto.role === 'KOL' ? { create: { fullName: dto.name } } : undefined,
       },
     });
-    return { message: 'Đăng ký thành công', userId: user.id };
-  }
 
-  async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (!user || !(await bcrypt.compare(dto.password, user.password))) {
-      throw new UnauthorizedException('Sai thông tin đăng nhập');
-    }
+    const token = this.generateToken(user.id, user.email, user.role);
     
-    // Check Ban status (Tech Debt #4)
-    if (user.isBanned) {
-      throw new UnauthorizedException('Tài khoản của bạn đã bị khóa vĩnh viễn do vi phạm chính sách.');
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role as any,
+      },
+    };
+  }
+
+  async login(dto: LoginDto): Promise<AuthResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
-    return { access_token: await this.jwtService.signAsync(payload), role: user.role };
+    const isPasswordValid = await bcrypt.compare(dto.password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    }
+
+    if (user.isBanned) {
+      throw new UnauthorizedException('Tài khoản đã bị khóa');
+    }
+
+    const token = this.generateToken(user.id, user.email, user.role);
+    this.logger.log(`User logged in: ${user.id}`);
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role as any,
+      },
+    };
   }
 
-  async updateKolProfile(userId: string, dto: UpdateKolProfileDto) {
-    // Với KOL, trường ảnh là 'avatar'
-    return this.prisma.kolProfile.update({
-      where: { userId },
-      data: {
-        fullName: dto.fullName,
-        bio: dto.bio,
-        phone: dto.phone,
-        address: dto.address,
-        bankName: dto.bankName,
-        bankAccount: dto.bankAccount,
-        socialLink: dto.socialLink,
-        avatar: dto.avatar, 
-      }
-    });
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    this.logger.log(`Updating profile for user: ${userId}`);
+    
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    // CLEAN DATA: Chuyển chuỗi rỗng thành null để tránh lỗi validation DB hoặc logic sau này
+    const cleanData = { ...dto };
+    if (cleanData.socialLink === '') cleanData.socialLink = null;
+    if (cleanData.bio === '') cleanData.bio = null;
+    if (cleanData.phone === '') cleanData.phone = null;
+
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: cleanData,
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          avatar: true,
+          bio: true,
+          phone: true,
+          socialLink: true,
+          role: true,
+          isEmailVerified: true,
+          createdAt: true,
+        }
+      });
+      
+      this.logger.log(`Profile updated successfully for: ${userId}`);
+      // Chuẩn hóa response trả về đúng format User Interface ở Frontend
+      return {
+        ...updatedUser,
+        createdAt: updatedUser.createdAt.toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(`Failed to update profile: ${error.message}`);
+      throw error;
+    }
   }
 
-  async updateBrandProfile(userId: string, dto: UpdateBrandProfileDto) {
-    // Với Brand, trường ảnh là 'logo'. 
-    // DTO đã được chuẩn hóa ở Bước 6.1 Hành động 1 để có trường 'logo'.
-    return this.prisma.brandProfile.update({
-      where: { userId },
-      data: {
-        companyName: dto.companyName,
-        description: dto.description,
-        website: dto.website,
-        industry: dto.industry,
-        address: dto.address,
-        phone: dto.phone,
-        logo: dto.logo, // Sử dụng đúng trường logo
-      }
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+            id: true, email: true, fullName: true, avatar: true, bio: true, phone: true, socialLink: true, role: true, isEmailVerified: true, createdAt: true
+        }
     });
+    
+    if (user) {
+        return {
+            ...user,
+            createdAt: user.createdAt.toISOString()
+        }
+    }
+    return null;
   }
 
-  async getMe(userId: string) {
-    return this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { brandProfile: true, kolProfile: true }
-    });
-  }
-
-  async getNotifications(userId: string) {
-    return this.prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 20 
-    });
-  }
-
-  async markRead(notiId: string) {
-    return this.prisma.notification.update({
-      where: { id: notiId },
-      data: { isRead: true }
-    });
-  }
-
-  async getPublicKolProfile(kolId: string) {
-    const kol = await this.prisma.kolProfile.findUnique({
-      where: { id: kolId },
-      include: {
-        user: { select: { isVerified: true } }
-      }
-    });
-
-    if (!kol) throw new NotFoundException('Không tìm thấy KOL này');
-    return kol;
+  private generateToken(userId: string, email: string, role: string): string {
+    const payload = { sub: userId, email, role };
+    return this.jwtService.sign(payload);
   }
 }

@@ -1,195 +1,169 @@
 'use client';
-import { useState, useEffect } from 'react';
-import api from '@/utils/api';
-import { useRouter, useParams } from 'next/navigation';
+
+import { useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useCampaignDetail, useUpdateCampaign } from '@/hooks/useCampaigns';
 import DashboardLayout from '@/components/DashboardLayout';
-import { ArrowLeft, Save, Loader2, Edit3 } from 'lucide-react';
-import Link from 'next/link';
+import AuthGuard from '@/components/AuthGuard';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Save, X, Loader2 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+// --- SCHEMA FIX (NỚI LỎNG) ---
+const campaignSchema = z.object({
+  title: z.string().min(5, 'Tiêu đề quá ngắn').max(100),
+  // Giảm yêu cầu description xuống, hoặc cho phép optional nếu cần
+  description: z.string().min(10, 'Mô tả cần chi tiết hơn (tối thiểu 10 ký tự)'), 
+  requirements: z.string().optional(),
+  // Budget: Cho phép 0 (nghĩa là Freecast/Thương lượng)
+  budget: z.coerce.number().min(0, 'Ngân sách không được âm'), 
+  deadline: z.string().refine((date) => new Date(date) > new Date(), {
+    message: "Hạn nộp phải ở tương lai",
+  }),
+});
+
+type CampaignFormValues = z.infer<typeof campaignSchema>;
 
 export default function EditCampaignPage() {
+  const params = useParams();
+  const id = params?.id as string;
   const router = useRouter();
-  const { id } = useParams();
-  
-  const [loading, setLoading] = useState(false); // Loading khi submit
-  const [fetching, setFetching] = useState(true); // Loading khi lấy dữ liệu ban đầu
-  
-  const [form, setForm] = useState({
-    title: '', 
-    description: '', 
-    productName: '', 
-    productValue: '',
-    platform: 'TikTok', 
-    requirements: '', 
-    deadline: ''
+
+  const { data: campaign, isLoading: isLoadingData, error } = useCampaignDetail(id);
+  const { mutate: updateCampaign, isPending } = useUpdateCampaign();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<CampaignFormValues>({
+    resolver: zodResolver(campaignSchema),
   });
 
-  // 1. Lấy dữ liệu chiến dịch cũ
   useEffect(() => {
-    if (!id) return;
-    
-    api.get(`/campaigns/${id}`)
-      .then(res => {
-        const data = res.data;
-        // Format lại ngày tháng để hiển thị đúng trong input type="date"
-        const formattedDate = data.deadline ? new Date(data.deadline).toISOString().split('T')[0] : '';
-        
-        setForm({
-          title: data.title || '',
-          description: data.description || '',
-          productName: data.productName || '',
-          productValue: data.productValue || '',
-          platform: data.platform || 'TikTok',
-          requirements: data.requirements || '',
-          deadline: formattedDate
-        });
-      })
-      .catch(err => {
-        console.error(err);
-        alert("Không thể tải thông tin chiến dịch hoặc bạn không có quyền truy cập.");
-        router.push('/brand/campaigns');
-      })
-      .finally(() => setFetching(false));
-  }, [id, router]);
+    if (campaign) {
+      let formattedDeadline = '';
+      if (campaign.deadline) {
+        try {
+          formattedDeadline = new Date(campaign.deadline).toISOString().split('T')[0];
+        } catch (e) {
+          console.error("Invalid date format:", campaign.deadline);
+        }
+      }
 
-  // 2. Xử lý cập nhật
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await api.patch(`/campaigns/${id}`, { 
-        ...form, 
-        deadline: form.deadline ? new Date(form.deadline) : undefined 
+      reset({
+        title: campaign.title || '',
+        description: campaign.description || '',
+        requirements: campaign.requirements || '',
+        budget: campaign.budget || 0,
+        deadline: formattedDeadline,
       });
-      alert('Cập nhật chiến dịch thành công!');
-      router.push('/brand/campaigns');
-    } catch (err) {
-      alert('Lỗi khi cập nhật chiến dịch. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
     }
+  }, [campaign, reset]);
+
+  const onSubmit = (data: CampaignFormValues) => {
+    updateCampaign({
+      id,
+      data: {
+        ...data,
+        budget: Number(data.budget),
+        deadline: new Date(data.deadline).toISOString(),
+      },
+    });
   };
 
-  if (fetching) return (
-    <DashboardLayout>
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="animate-spin text-indigo-600 h-8 w-8"/>
-      </div>
-    </DashboardLayout>
-  );
+  if (isLoadingData) {
+    return (
+      <DashboardLayout>
+        <div className="flex h-screen items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error || !campaign) {
+    return (
+      <DashboardLayout>
+        <div className="flex h-screen items-center justify-center flex-col">
+           <h2 className="text-xl font-bold text-gray-800">Không tìm thấy chiến dịch</h2>
+           <Button variant="outline" onClick={() => router.push('/brand/campaigns')}>Quay lại</Button>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
-    <DashboardLayout>
-      <div className="max-w-3xl mx-auto">
-        <Link href="/brand/campaigns" className="flex items-center text-slate-500 mb-6 hover:text-indigo-600 font-medium transition-colors">
-            <ArrowLeft size={20} className="mr-2"/> Quay lại danh sách
-        </Link>
-        
-        <h1 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Edit3 size={24} className="text-indigo-600"/> Chỉnh sửa Chiến dịch
-        </h1>
-        
-        <form onSubmit={handleSubmit} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-6">
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Tên chiến dịch</label>
-            <input 
-                required 
-                type="text" 
-                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" 
-                value={form.title} 
-                onChange={e => setForm({...form, title: e.target.value})} 
-                placeholder="VD: Review Tết 2024..."
-            />
+    <AuthGuard allowedRoles={['BRAND']}>
+      <DashboardLayout>
+        <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+          <div className="mb-8 border-b border-gray-200 pb-5">
+            <h2 className="text-2xl font-bold leading-7 text-gray-900">
+              Chỉnh sửa chiến dịch
+            </h2>
           </div>
-          
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Sản phẩm</label>
-                <input 
-                    required 
-                    type="text" 
-                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" 
-                    value={form.productName} 
-                    onChange={e => setForm({...form, productName: e.target.value})} 
+
+          <div className="bg-white shadow rounded-lg p-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              
+              <div>
+                <Label htmlFor="title">Tiêu đề chiến dịch</Label>
+                <Input id="title" {...register('title')} className={errors.title ? "border-red-500" : ""} />
+                {errors.title && <p className="mt-1 text-sm text-red-500">{errors.title.message}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="description">Mô tả chi tiết</Label>
+                <textarea
+                  id="description"
+                  rows={5}
+                  {...register('description')}
+                  className={`flex w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${errors.description ? "border-red-500" : "border-gray-300 focus-visible:ring-indigo-500"}`}
                 />
-            </div>
-            <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Giá trị (Quyền lợi)</label>
-                <input 
-                    required 
-                    type="text" 
-                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" 
-                    value={form.productValue} 
-                    onChange={e => setForm({...form, productValue: e.target.value})} 
-                    placeholder="VD: 500.000đ + Sản phẩm"
+                {errors.description && <p className="mt-1 text-sm text-red-500">{errors.description.message}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="requirements">Yêu cầu ứng viên (Tùy chọn)</Label>
+                <textarea
+                  id="requirements"
+                  rows={3}
+                  {...register('requirements')}
+                  className="flex w-full rounded-md border border-gray-300 bg-background px-3 py-2 text-sm ring-offset-background"
                 />
-            </div>
-          </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Nền tảng</label>
-                <select 
-                    className="w-full p-3 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" 
-                    value={form.platform} 
-                    onChange={e => setForm({...form, platform: e.target.value})}
-                >
-                    <option value="TikTok">TikTok</option>
-                    <option value="YouTube">YouTube</option>
-                    <option value="Facebook">Facebook</option>
-                    <option value="Instagram">Instagram</option>
-                </select>
-            </div>
-            <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Hạn nộp hồ sơ</label>
-                <input 
-                    required 
-                    type="date" 
-                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900" 
-                    value={form.deadline} 
-                    onChange={e => setForm({...form, deadline: e.target.value})} 
-                />
-            </div>
-          </div>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="budget">Ngân sách (VND) - Để 0 nếu thương lượng</Label>
+                  <Input id="budget" type="number" {...register('budget')} className={errors.budget ? "border-red-500" : ""} />
+                  {errors.budget && <p className="mt-1 text-sm text-red-500">{errors.budget.message}</p>}
+                </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Mô tả chi tiết</label>
-            <textarea 
-                required 
-                className="w-full p-3 border border-slate-200 rounded-xl h-32 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 resize-none" 
-                value={form.description} 
-                onChange={e => setForm({...form, description: e.target.value})} 
-            />
-          </div>
+                <div>
+                  <Label htmlFor="deadline">Hạn nộp hồ sơ</Label>
+                  <Input id="deadline" type="date" {...register('deadline')} className={errors.deadline ? "border-red-500" : ""} />
+                  {errors.deadline && <p className="mt-1 text-sm text-red-500">{errors.deadline.message}</p>}
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Yêu cầu ứng viên</label>
-            <textarea 
-                required 
-                className="w-full p-3 border border-slate-200 rounded-xl h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 resize-none" 
-                value={form.requirements} 
-                onChange={e => setForm({...form, requirements: e.target.value})} 
-                placeholder="- Trên 10k Follower..."
-            />
+              <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 mt-6">
+                <Button type="button" variant="outline" onClick={() => router.back()}>
+                  <X className="mr-2 h-4 w-4" /> Hủy
+                </Button>
+                <Button type="submit" isLoading={isPending}>
+                  <Save className="mr-2 h-4 w-4" /> Lưu thay đổi
+                </Button>
+              </div>
+            </form>
           </div>
-
-          <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-             <Link 
-                href="/brand/campaigns"
-                className="px-6 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors"
-             >
-                Hủy bỏ
-             </Link>
-             <button 
-                type="submit" 
-                disabled={loading} 
-                className="px-8 py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-indigo-500/30 disabled:opacity-70 disabled:cursor-not-allowed"
-             >
-                {loading ? <Loader2 className="animate-spin"/> : <Save size={20}/>} 
-                Lưu Thay Đổi
-             </button>
-          </div>
-        </form>
-      </div>
-    </DashboardLayout>
+        </div>
+      </DashboardLayout>
+    </AuthGuard>
   );
 }

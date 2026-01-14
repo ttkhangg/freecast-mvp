@@ -1,48 +1,25 @@
 'use client';
-import { useState, useEffect } from 'react';
-import Sidebar from './Sidebar';
-import Cookies from 'js-cookie';
-import { useRouter, usePathname } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [role, setRole] = useState<string | null>(null);
-  const router = useRouter();
-  const pathname = usePathname();
+import Sidebar from '@/components/Sidebar';
+// import Header from '@/components/Header'; // Nếu có Header thì uncomment
 
-  useEffect(() => {
-    const token = Cookies.get('token');
-    const userRole = Cookies.get('role');
-    
-    if (!token || !userRole) {
-      router.push('/login');
-      return;
-    }
-
-    // SECURITY FIX: Chặn User thường truy cập route /admin
-    if (pathname.startsWith('/admin') && userRole !== 'ADMIN') {
-        alert("Bạn không có quyền truy cập trang này!");
-        router.push('/dashboard');
-        return;
-    }
-
-    setRole(userRole);
-  }, [pathname, router]);
-
-  if (!role) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin text-indigo-600"/>
-    </div>
-  );
-
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar userRole={role} />
-      <main className="flex-1 ml-64 p-8 transition-all duration-300">
-        <div className="max-w-7xl mx-auto">
+    <div className="flex h-screen bg-gray-100">
+      {/* Sidebar cố định bên trái */}
+      <Sidebar />
+
+      {/* Khu vực nội dung chính */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* <Header />  */}
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
           {children}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

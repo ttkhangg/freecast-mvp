@@ -1,52 +1,41 @@
-import { Body, Controller, Post, Get, Put, Request, UseGuards, Patch, Param } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Patch, UseGuards, Request, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
-import { UpdateBrandProfileDto, UpdateKolProfileDto } from './dto/update-profile.dto';
-import { AuthGuard } from './auth.guard';
+import { RegisterDto, LoginDto, AuthResponseDto } from './dto/auth.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  register(@Body() dto: RegisterDto) { return this.authService.register(dto); }
+  @ApiOperation({ summary: 'Đăng ký tài khoản mới' })
+  async register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
+    return this.authService.register(dto);
+  }
 
   @Post('login')
-  login(@Body() dto: LoginDto) { return this.authService.login(dto); }
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đăng nhập' })
+  async login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
+    return this.authService.login(dto);
+  }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('me')
-  getMe(@Request() req) { return this.authService.getMe(req.user.sub); }
-
-  @UseGuards(AuthGuard)
-  @Put('profile/kol')
-  updateKol(@Request() req, @Body() dto: UpdateKolProfileDto) {
-    return this.authService.updateKolProfile(req.user.sub, dto);
+  @ApiOperation({ summary: 'Lấy thông tin User hiện tại' })
+  async getProfile(@Request() req) {
+    return this.authService.getProfile(req.user.id);
   }
 
-  @UseGuards(AuthGuard)
-  @Put('profile/brand')
-  updateBrand(@Request() req, @Body() dto: UpdateBrandProfileDto) {
-    return this.authService.updateBrandProfile(req.user.sub, dto);
-  }
-
-  @UseGuards(AuthGuard)
-  @Get('notifications')
-  getNotifications(@Request() req) {
-    return this.authService.getNotifications(req.user.sub);
-  }
-
-  @UseGuards(AuthGuard)
-  @Patch('notifications/:id/read')
-  markRead(@Param('id') id: string) {
-    return this.authService.markRead(id);
-  }
-
-  // --- MỚI (PHASE 7.3): Public Profile API ---
-  // API này không cần AuthGuard vì Brand chưa đăng nhập cũng có thể xem (Viral)
-  // Hoặc Brand đã đăng nhập xem chi tiết ứng viên
-  @Get('public/kol/:id')
-  getPublicKol(@Param('id') id: string) {
-    return this.authService.getPublicKolProfile(id);
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch('profile')
+  @ApiOperation({ summary: 'Cập nhật hồ sơ (Bio, Avatar...)' })
+  async updateProfile(@Request() req, @Body() dto: UpdateProfileDto) {
+    return this.authService.updateProfile(req.user.id, dto);
   }
 }

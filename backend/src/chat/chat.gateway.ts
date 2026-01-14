@@ -1,29 +1,54 @@
-import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody, ConnectedSocket } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
+  WebSocketServer,
+} from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service';
+import { CreateMessageDto } from './dto/create-message.dto';
+import { UseGuards, Logger } from '@nestjs/common';
+import { WsJwtGuard } from './ws-jwt.guard';
 
 @WebSocketGateway({
-  cors: { origin: '*' }, // Cho phép Frontend kết nối
+  cors: {
+    origin: '*', 
+    credentials: true,
+  },
 })
 export class ChatGateway {
   @WebSocketServer()
   server: Server;
+  private logger = new Logger('ChatGateway');
 
   constructor(private readonly chatService: ChatService) {}
 
-  // 1. Khi User vào trang chi tiết đơn hàng -> Join vào "phòng chat" riêng của đơn đó
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('joinRoom')
-  handleJoinRoom(@MessageBody() applicationId: string, @ConnectedSocket() client: Socket) {
-    client.join(applicationId); // Join room theo ID đơn hàng
+  handleJoinRoom(@ConnectedSocket() client: Socket, @MessageBody() payload: { applicationId: string }) {
+    client.join(payload.applicationId);
+    this.logger.log(`Client ${client.id} joined room ${payload.applicationId}`);
   }
 
-  // 2. Khi User gửi tin nhắn
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('sendMessage')
-  async handleMessage(@MessageBody() payload: { applicationId: string, senderId: string, content: string }) {
-    // Lưu vào DB
-    const newMessage = await this.chatService.saveMessage(payload.applicationId, payload.senderId, payload.content);
-    
-    // Bắn tin nhắn này tới TẤT CẢ mọi người trong phòng (bao gồm cả người gửi)
-    this.server.to(payload.applicationId).emit('newMessage', newMessage);
+  async handleMessage(@ConnectedSocket() client: Socket, @MessageBody() payload: CreateMessageDto) {
+    try {
+      // @ts-ignore
+      const userId = client.user.id;
+      
+      // 1. LƯU VÀO DB TRƯỚC
+      const message = await this.chatService.saveMessage(userId, payload);
+      this.logger.log(`Message saved to DB: ${message.id}`);
+
+      // 2. GỬI LẠI CHO PHÒNG CHAT
+      this.server.to(payload.applicationId).emit('newMessage', message);
+      
+      return message;
+    } catch (error) {
+      this.logger.error(`Send message failed: ${error.message}`);
+      client.emit('error', 'Gửi tin nhắn thất bại: ' + error.message);
+    }
   }
 }

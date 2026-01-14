@@ -1,21 +1,30 @@
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { JwtModule } from '@nestjs/jwt';
-import { PrismaModule } from '../prisma/prisma.module'; // <-- THÊM DÒNG NÀY
+import { PrismaModule } from '../prisma/prisma.module';
+import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
-    PrismaModule, // <-- THÊM DÒNG NÀY ĐỂ SỬA LỖI
-    JwtModule.register({
-      global: true,
-      secret: 'SUPER_SECRET_KEY_123', // Thực tế nên để trong .env
-      signOptions: { expiresIn: '1d' }, // Token hết hạn sau 1 ngày
+    PrismaModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET') || 'SuperSecretKeyForUnicornDev2026',
+        signOptions: { 
+          expiresIn: configService.get<string>('JWT_EXPIRATION') || '1d' 
+        },
+      }),
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, JwtStrategy],
+  // QUAN TRỌNG: Phải export JwtModule để ChatModule dùng được JwtService
+  exports: [JwtStrategy, PassportModule, JwtModule], 
 })
 export class AuthModule {}
-
-

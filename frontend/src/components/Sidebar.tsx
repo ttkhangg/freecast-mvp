@@ -1,71 +1,144 @@
 'use client';
+
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutGrid, Briefcase, User, LogOut, ShieldCheck, MessageSquare } from 'lucide-react';
-import Cookies from 'js-cookie';
+import { useAuthStore } from '@/store/useAuthStore';
+import { Role } from '@/types';
+import { 
+  LayoutDashboard, 
+  Briefcase, 
+  MessageSquare, 
+  User, 
+  LogOut,
+  Settings,
+  PlusCircle
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-const menuItems = [
-  { icon: LayoutGrid, label: 'Tổng quan', href: '/dashboard', roles: ['BRAND', 'KOL', 'ADMIN'] },
-  { icon: Briefcase, label: 'Việc của tôi', href: '/my-jobs', roles: ['KOL'] },
-  { icon: Briefcase, label: 'Quản lý Campaign', href: '/brand/campaigns', roles: ['BRAND'] },
-  { icon: MessageSquare, label: 'Tin nhắn', href: '/messages', roles: ['BRAND', 'KOL'] }, // MỚI THÊM
-  { icon: User, label: 'Hồ sơ', href: '/profile', roles: ['BRAND', 'KOL'] },
-  { icon: ShieldCheck, label: 'Admin Portal', href: '/admin', roles: ['ADMIN'] },
-];
-
-export default function Sidebar({ userRole }: { userRole: string }) {
+export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, logout } = useAuthStore();
 
   const handleLogout = () => {
-    Cookies.remove('token');
-    Cookies.remove('role');
-    router.push('/login');
+    logout();
+    router.replace('/login');
+  };
+
+  const getCampaignLink = () => {
+    if (user?.role === Role.BRAND) return '/brand/campaigns';
+    return '/campaigns';
+  };
+
+  const navItems = [
+    { 
+      name: 'Tổng quan', 
+      href: '/dashboard', 
+      icon: LayoutDashboard 
+    },
+    { 
+      name: user?.role === Role.BRAND ? 'Quản lý Job' : 'Tìm việc', 
+      href: getCampaignLink(), 
+      icon: Briefcase 
+    },
+    { 
+      name: 'Tin nhắn', 
+      href: '/messages', 
+      icon: MessageSquare 
+    },
+    { 
+      name: 'Hồ sơ', 
+      href: '/profile', 
+      icon: User 
+    },
+  ];
+
+  if (user?.role === Role.ADMIN) {
+      navItems.push({ name: 'Quản trị Users', href: '/admin/users', icon: Settings });
+  }
+
+  // Helper lấy chữ cái đầu
+  const getInitials = (name?: string) => {
+    return name ? name.charAt(0).toUpperCase() : 'U';
   };
 
   return (
-    <aside className="w-64 bg-slate-900 text-white flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 border-r border-white/5">
-      {/* Logo trỏ về Dashboard */}
-      <div 
-        className="p-6 border-b border-white/10 flex items-center gap-3 cursor-pointer hover:bg-white/5 transition-colors" 
-        onClick={() => router.push('/dashboard')}
-      >
-        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg shadow-lg flex items-center justify-center font-bold text-sm">F</div>
-        <span className="font-bold text-xl tracking-tight">FreeCast</span>
+    <div className="flex flex-col w-64 bg-white border-r border-gray-200 min-h-screen transition-all duration-300">
+      <div className="flex items-center justify-center h-16 border-b border-gray-200 bg-gray-50">
+        <span className="text-xl font-bold text-indigo-600 tracking-wider">FreeCast</span>
+      </div>
+      
+      {/* User Info Snippet */}
+      <div className="px-6 py-6 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0">
+            {user?.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img 
+                src={user.avatar} 
+                alt="Avatar" 
+                className="h-10 w-10 rounded-full object-cover border border-gray-200 shadow-sm"
+              />
+            ) : (
+              <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold border border-indigo-200">
+                {getInitials(user?.fullName)}
+              </div>
+            )}
+          </div>
+          <div className="overflow-hidden">
+            <p className="text-sm font-semibold text-gray-900 truncate max-w-[120px]">{user?.fullName || 'Người dùng'}</p>
+            <p className="text-xs text-gray-500 truncate capitalize">{user?.role?.toLowerCase() || 'guest'}</p>
+          </div>
+        </div>
+        
+        {user?.role === Role.BRAND && (
+          <Link href="/brand/campaigns/new" className="mt-4 block">
+            <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none transition-colors">
+              <PlusCircle className="mr-2 h-4 w-4" /> Đăng Job Mới
+            </button>
+          </Link>
+        )}
       </div>
 
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {menuItems.map((item) => {
-          if (!item.roles.includes(userRole)) return null;
-          // Logic active: match chính xác hoặc match folder con (trừ dashboard để tránh active nhầm khi ở root)
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
-          
-          return (
-            <Link 
-              key={item.href} 
-              href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                isActive 
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' 
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <item.icon size={20} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="flex-1 flex flex-col overflow-y-auto pt-4 pb-4">
+        <nav className="flex-1 px-3 space-y-1">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+            
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  "group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ease-in-out",
+                  isActive
+                    ? "bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600 shadow-sm"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:pl-4"
+                )}
+              >
+                <item.icon
+                  className={cn(
+                    "mr-3 flex-shrink-0 h-5 w-5 transition-colors",
+                    isActive ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-500"
+                  )}
+                  aria-hidden="true"
+                />
+                {item.name}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
 
-      <div className="p-4 border-t border-white/10">
-        <button 
+      <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
+        <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 w-full transition-all"
+          className="flex-shrink-0 w-full group flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-red-50 hover:text-red-700 transition-colors"
         >
-          <LogOut size={20} />
+          <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" />
           Đăng xuất
         </button>
       </div>
-    </aside>
+    </div>
   );
 }
