@@ -1,13 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsGateway: NotificationsGateway // Inject Gateway
+  ) {}
 
-  // Tạo thông báo mới (Hàm này sẽ được gọi từ các module khác)
+  // Tạo thông báo mới và bắn Realtime
   async create(userId: string, content: string, type: string = 'SYSTEM') {
-    return this.prisma.notification.create({
+    // 1. Lưu DB
+    const notification = await this.prisma.notification.create({
       data: {
         userId,
         content,
@@ -15,24 +20,25 @@ export class NotificationsService {
         isRead: false,
       },
     });
+
+    // 2. Bắn Socket ngay lập tức
+    this.notificationsGateway.sendNotificationToUser(userId, notification);
+
+    return notification;
   }
 
-  // Lấy danh sách thông báo của User
   async findAll(userId: string) {
     return this.prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: 20, // Chỉ lấy 20 thông báo mới nhất
+      take: 20,
     });
   }
 
-  // Đánh dấu đã đọc
   async markAsRead(id: string, userId: string) {
-    // Verify ownership
     const notif = await this.prisma.notification.findFirst({
         where: { id, userId }
     });
-    
     if (!notif) return null;
 
     return this.prisma.notification.update({
@@ -41,7 +47,6 @@ export class NotificationsService {
     });
   }
 
-  // Đánh dấu tất cả là đã đọc
   async markAllAsRead(userId: string) {
     return this.prisma.notification.updateMany({
         where: { userId, isRead: false },

@@ -1,7 +1,7 @@
 'use client';
 
 import Sidebar from '@/components/Sidebar';
-// import Header from '@/components/Header'; // Nếu có Header thì uncomment
+import NotificationBell from '@/components/NotificationBell';
 
 export default function DashboardLayout({
   children,
@@ -9,14 +9,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar cố định bên trái */}
+    <div className="flex h-screen bg-gray-50">
       <Sidebar />
 
-      {/* Khu vực nội dung chính */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* <Header />  */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
+        {/* Header đơn giản có chuông thông báo */}
+        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-end px-8">
+          <NotificationBell />
+        </header>
+
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
           {children}
         </main>
       </div>

@@ -2,12 +2,15 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCampaignDto, UpdateCampaignDto } from './dto/create-campaign.dto';
 import { CampaignStatus, ApplicationStatus, Prisma } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CampaignsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService
+  ) {}
 
-  // --- CRUD CƠ BẢN ---
   async create(userId: string, dto: CreateCampaignDto) {
     return this.prisma.campaign.create({
       data: { ...dto, brandId: userId, status: CampaignStatus.OPEN },
@@ -33,13 +36,28 @@ export class CampaignsService {
     });
   }
 
+  async findMyApplications(userId: string) {
+    return this.prisma.application.findMany({
+      where: { kolId: userId },
+      include: {
+        campaign: {
+          include: {
+            brand: { select: { id: true, fullName: true, avatar: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async findOne(id: string) {
     const campaign = await this.prisma.campaign.findUnique({
       where: { id },
       include: {
         brand: { select: { id: true, fullName: true, avatar: true, bio: true } },
         applications: {
-            include: { kol: { select: { id: true, fullName: true, avatar: true, email: true, phone: true } } }
+            // FIX: Removed duplicate 'avatar: true' key
+            include: { kol: { select: { id: true, fullName: true, avatar: true, email: true, phone: true, address: true } } }
         }, 
       },
     });
@@ -60,13 +78,18 @@ export class CampaignsService {
     return this.prisma.campaign.delete({ where: { id } });
   }
 
-  // --- APPLICATION FLOW ---
   async apply(campaignId: string, kolId: string) {
     const campaign = await this.prisma.campaign.findUnique({ where: { id: campaignId } });
     if (!campaign || campaign.status !== CampaignStatus.OPEN) throw new BadRequestException('Chiến dịch đã đóng');
     const existing = await this.prisma.application.findUnique({ where: { campaignId_kolId: { campaignId, kolId } } });
     if (existing) throw new BadRequestException('Bạn đã ứng tuyển rồi');
-    return this.prisma.application.create({ data: { campaignId, kolId, status: ApplicationStatus.PENDING } });
+
+    const application = await this.prisma.application.create({
+      data: { campaignId, kolId, status: ApplicationStatus.PENDING },
+    });
+
+    await this.notificationsService.create(campaign.brandId, `Có người vừa ứng tuyển vào chiến dịch "${campaign.title}"`, 'CAMPAIGN');
+    return application;
   }
 
   async cancelApplication(campaignId: string, kolId: string) {
@@ -79,42 +102,63 @@ export class CampaignsService {
   async approveApplication(applicationId: string, brandId: string) {
     const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.campaign.brandId !== brandId) throw new ForbiddenException('Không có quyền');
-    return this.prisma.application.update({ where: { id: applicationId }, data: { status: ApplicationStatus.APPROVED } });
+    
+    const updated = await this.prisma.application.update({
+      where: { id: applicationId },
+      data: { status: ApplicationStatus.APPROVED },
+    });
+    await this.notificationsService.create(app.kolId, `Tin vui! Bạn đã được DUYỆT vào chiến dịch "${app.campaign.title}"`, 'BOOKING');
+    return updated;
   }
 
   async rejectApplication(applicationId: string, brandId: string) {
     const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.campaign.brandId !== brandId) throw new ForbiddenException('Không có quyền');
-    return this.prisma.application.update({ where: { id: applicationId }, data: { status: ApplicationStatus.REJECTED } });
+    
+    const updated = await this.prisma.application.update({
+      where: { id: applicationId },
+      data: { status: ApplicationStatus.REJECTED },
+    });
+    await this.notificationsService.create(app.kolId, `Hồ sơ cho chiến dịch "${app.campaign.title}" bị từ chối`, 'BOOKING');
+    return updated;
   }
-
-  // --- BOOKING FLOW (NEW V2.1) ---
 
   async updateTracking(applicationId: string, brandId: string, trackingCode: string) {
     const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.campaign.brandId !== brandId) throw new ForbiddenException('Không có quyền');
-    return this.prisma.application.update({ where: { id: applicationId }, data: { trackingCode } });
+    
+    const updated = await this.prisma.application.update({ where: { id: applicationId }, data: { trackingCode } });
+    await this.notificationsService.create(app.kolId, `Sản phẩm cho "${app.campaign.title}" đã gửi. Mã vận đơn: ${trackingCode}`, 'SHIPPING');
+    return updated;
   }
 
   async confirmProductReceived(applicationId: string, kolId: string) {
-    const app = await this.prisma.application.findUnique({ where: { id: applicationId } });
+    const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.kolId !== kolId) throw new ForbiddenException('Không có quyền');
-    return this.prisma.application.update({ where: { id: applicationId }, data: { isProductReceived: true } });
+    
+    const updated = await this.prisma.application.update({ where: { id: applicationId }, data: { isProductReceived: true } });
+    await this.notificationsService.create(app.campaign.brandId, `KOL đã nhận hàng cho chiến dịch "${app.campaign.title}"`, 'SHIPPING');
+    return updated;
   }
 
   async submitWork(applicationId: string, kolId: string, submissionLink: string) {
-    const app = await this.prisma.application.findUnique({ where: { id: applicationId } });
+    const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.kolId !== kolId) throw new ForbiddenException('Không có quyền');
-    return this.prisma.application.update({ where: { id: applicationId }, data: { submissionLink } });
+    
+    const updated = await this.prisma.application.update({ where: { id: applicationId }, data: { submissionLink } });
+    await this.notificationsService.create(app.campaign.brandId, `KOL nộp bài cho chiến dịch "${app.campaign.title}"`, 'WORK');
+    return updated;
   }
 
   async completeJob(applicationId: string, brandId: string) {
     const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.campaign.brandId !== brandId) throw new ForbiddenException('Không có quyền');
-    return this.prisma.application.update({ where: { id: applicationId }, data: { status: ApplicationStatus.COMPLETED } });
+    
+    const updated = await this.prisma.application.update({ where: { id: applicationId }, data: { status: ApplicationStatus.COMPLETED } });
+    await this.notificationsService.create(app.kolId, `Chiến dịch "${app.campaign.title}" hoàn tất. Thanh toán đang xử lý.`, 'PAYMENT');
+    return updated;
   }
 
-  // Lấy chi tiết đơn để Brand xem địa chỉ KOL (chỉ khi Approved)
   async getApplicationDetail(applicationId: string, userId: string) {
     const app = await this.prisma.application.findUnique({
       where: { id: applicationId },

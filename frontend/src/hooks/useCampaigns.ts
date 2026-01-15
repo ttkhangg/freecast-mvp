@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { Campaign, CampaignStatus } from '@/types';
 
+// ... (Giữ các interface cũ) ...
 export interface CreateCampaignDto {
   title: string;
   description: string;
@@ -13,132 +14,107 @@ export interface CreateCampaignDto {
   status?: CampaignStatus;
 }
 
-// 1. Hook lấy chi tiết
+// ... (Giữ các hook cũ useCampaignDetail, useMyCampaigns...) ...
 export const useCampaignDetail = (id: string) => {
   return useQuery<Campaign & { applications: any[] }>({
     queryKey: ['campaign', id],
-    queryFn: async () => {
-      // api.get giờ đây trả về đúng object Campaign (do interceptor đã bóc vỏ)
-      return await api.get(`/campaigns/${id}`);
-    },
+    queryFn: async () => await api.get(`/campaigns/${id}`),
     enabled: !!id,
-    retry: 1,
   });
 };
 
-// 2. Hook lấy chiến dịch của tôi
 export const useMyCampaigns = () => {
   return useQuery<Campaign[]>({
     queryKey: ['my-campaigns'],
-    queryFn: async () => {
-      return await api.get('/campaigns/brand/my-campaigns');
-    },
+    queryFn: async () => await api.get('/campaigns/brand/my-campaigns'),
   });
 };
 
-// 3. Tạo chiến dịch
+// --- NEW HOOK: Lấy danh sách việc làm của KOL ---
+export const useMyJobs = () => {
+  return useQuery<any[]>({ // Trả về list Application
+    queryKey: ['my-jobs'],
+    queryFn: async () => await api.get('/campaigns/kol/my-jobs'),
+  });
+};
+
+// ... (Giữ nguyên các hook mutation: create, update, apply, cancel...) ...
 export const useCreateCampaign = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
-
   return useMutation({
-    mutationFn: async (data: CreateCampaignDto) => {
-      return await api.post('/campaigns', data);
-    },
+    mutationFn: async (data: CreateCampaignDto) => await api.post('/campaigns', data),
     onSuccess: () => {
       toast.success('Chiến dịch đã được tạo thành công!');
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['my-campaigns'] });
       router.push('/brand/campaigns');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Lỗi khi tạo chiến dịch');
-    },
+    onError: (e: any) => toast.error(e.message || 'Lỗi'),
   });
 };
 
-// 4. Update chiến dịch
 export const useUpdateCampaign = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
-
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<CreateCampaignDto> }) => {
-      return await api.patch(`/campaigns/${id}`, data);
-    },
+    mutationFn: async ({ id, data }: { id: string; data: Partial<CreateCampaignDto> }) => await api.patch(`/campaigns/${id}`, data),
     onSuccess: (data: any) => {
       toast.success('Cập nhật thành công!');
-      queryClient.invalidateQueries({ queryKey: ['campaign'] }); 
+      queryClient.invalidateQueries({ queryKey: ['campaign'] });
       queryClient.invalidateQueries({ queryKey: ['my-campaigns'] });
       router.back();
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Lỗi khi cập nhật');
-    },
+    onError: (e: any) => toast.error(e.message || 'Lỗi'),
   });
 };
 
-// Các hook khác giữ nguyên (Apply, Cancel, Approve, Reject)
 export const useApplyCampaign = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (campaignId: string) => {
-      return await api.post(`/campaigns/${campaignId}/apply`);
-    },
+    mutationFn: async (campaignId: string) => await api.post(`/campaigns/${campaignId}/apply`),
     onSuccess: () => {
       toast.success('Ứng tuyển thành công!');
       queryClient.invalidateQueries({ queryKey: ['campaign'] });
+      queryClient.invalidateQueries({ queryKey: ['my-jobs'] }); // Cập nhật list việc làm
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Lỗi ứng tuyển');
-    },
+    onError: (e: any) => toast.error(e.message || 'Lỗi'),
   });
 };
 
 export const useCancelApplication = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (campaignId: string) => {
-      return await api.delete(`/campaigns/${campaignId}/apply`);
-    },
+    mutationFn: async (campaignId: string) => await api.delete(`/campaigns/${campaignId}/apply`),
     onSuccess: () => {
       toast.info('Đã hủy ứng tuyển.');
       queryClient.invalidateQueries({ queryKey: ['campaign'] });
+      queryClient.invalidateQueries({ queryKey: ['my-jobs'] }); // Cập nhật list việc làm
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Không thể hủy đơn');
-    },
+    onError: (e: any) => toast.error(e.message || 'Lỗi'),
   });
 };
 
 export const useApproveApplication = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (applicationId: string) => {
-      return await api.patch(`/campaigns/application/${applicationId}/approve`);
-    },
+    mutationFn: async (applicationId: string) => await api.patch(`/campaigns/application/${applicationId}/approve`),
     onSuccess: () => {
       toast.success('Đã duyệt ứng viên!');
       queryClient.invalidateQueries({ queryKey: ['campaign'] });
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Lỗi xử lý');
-    },
+    onError: (e: any) => toast.error(e.message || 'Lỗi'),
   });
 };
 
 export const useRejectApplication = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (applicationId: string) => {
-      return await api.patch(`/campaigns/application/${applicationId}/reject`);
-    },
+    mutationFn: async (applicationId: string) => await api.patch(`/campaigns/application/${applicationId}/reject`),
     onSuccess: () => {
       toast.info('Đã từ chối ứng viên.');
       queryClient.invalidateQueries({ queryKey: ['campaign'] });
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Lỗi xử lý');
-    },
+    onError: (e: any) => toast.error(e.message || 'Lỗi'),
   });
 };

@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
+import { NotificationsGateway } from './notifications.gateway'; // Import mới
 import { PrismaModule } from '../prisma/prisma.module';
+import { AuthModule } from '../auth/auth.module'; // Để dùng WsJwtGuard
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuthModule],
   controllers: [NotificationsController],
-  providers: [NotificationsService],
-  exports: [NotificationsService], // Export để CampaignService có thể gọi hàm tạo thông báo
+  providers: [NotificationsService, NotificationsGateway],
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}

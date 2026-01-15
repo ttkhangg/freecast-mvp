@@ -16,7 +16,7 @@ export class CampaignsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.BRAND)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Tạo chiến dịch' })
+  @ApiOperation({ summary: 'Tạo chiến dịch (Brand)' })
   create(@Request() req, @Body() createCampaignDto: CreateCampaignDto) {
     return this.campaignsService.create(req.user.id, createCampaignDto);
   }
@@ -28,6 +28,16 @@ export class CampaignsController {
   @ApiOperation({ summary: 'Lấy chiến dịch của Brand' })
   findMyCampaigns(@Request() req) {
     return this.campaignsService.findMyCampaigns(req.user.id);
+  }
+
+  // --- NEW ENDPOINT: Lấy danh sách việc làm của KOL ---
+  @Get('kol/my-jobs')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.KOL)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy danh sách việc làm đã ứng tuyển (KOL)' })
+  findMyApplications(@Request() req) {
+    return this.campaignsService.findMyApplications(req.user.id);
   }
 
   @Get()
@@ -59,8 +69,6 @@ export class CampaignsController {
   remove(@Request() req, @Param('id') id: string) {
     return this.campaignsService.remove(id, req.user.id);
   }
-
-  // --- BOOKING & APPLICATION API ---
 
   @Post(':id/apply')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -101,7 +109,7 @@ export class CampaignsController {
   @Get('application/:id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy chi tiết đơn (Kèm địa chỉ KOL)' })
+  @ApiOperation({ summary: 'Lấy chi tiết đơn' })
   getAppDetail(@Request() req, @Param('id') id: string) {
     return this.campaignsService.getApplicationDetail(id, req.user.id);
   }
@@ -110,7 +118,7 @@ export class CampaignsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.BRAND)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Brand cập nhật mã vận đơn' })
+  @ApiOperation({ summary: 'Cập nhật mã vận đơn' })
   @ApiBody({ schema: { properties: { trackingCode: { type: 'string' } } } })
   updateTracking(@Request() req, @Param('id') id: string, @Body('trackingCode') code: string) {
     return this.campaignsService.updateTracking(id, req.user.id, code);

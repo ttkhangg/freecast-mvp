@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsUrl, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class UpdateProfileDto {
   @ApiProperty({ required: false, example: 'Nguyen Van A' })
@@ -12,20 +13,23 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   @MaxLength(500)
+  @Transform(({ value }) => value === '' ? null : value) // Biến "" thành null
   bio?: string;
 
   @ApiProperty({ required: false, example: 'https://res.cloudinary.com/...' })
-  @IsString() // Avatar là chuỗi URL, nhưng ta dùng IsString để dễ tính hơn (hoặc IsUrl cũng được)
+  @IsString()
   @IsOptional()
   avatar?: string; 
 
   @ApiProperty({ required: false, example: '0912345678' })
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => value === '' ? null : value)
   phone?: string;
 
   @ApiProperty({ required: false, example: 'https://facebook.com/me' })
-  @IsUrl({}, { message: 'Link mạng xã hội không hợp lệ' }) // Chỉ validate nếu giá trị khác null/undefined
   @IsOptional()
+  @Transform(({ value }) => value === '' ? null : value)
+  @IsUrl({}, { message: 'Link mạng xã hội phải là URL hợp lệ (http/https)' })
   socialLink?: string;
 }
