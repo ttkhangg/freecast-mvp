@@ -1,4 +1,3 @@
-// --- USER TYPES ---
 export enum Role {
   ADMIN = 'ADMIN',
   BRAND = 'BRAND',
@@ -16,9 +15,9 @@ export interface User {
   socialLink?: string | null;
   isEmailVerified: boolean;
   createdAt: string;
+  rating?: number; // NEW: Số sao trung bình
 }
 
-// --- CAMPAIGN TYPES ---
 export enum CampaignStatus {
   OPEN = 'OPEN',
   PAUSED = 'PAUSED',
@@ -48,7 +47,6 @@ export interface Campaign {
   updatedAt: string;
 }
 
-// --- GENERIC API RESPONSE ---
 export interface ApiResponse<T> {
   data: T;
   statusCode: number;

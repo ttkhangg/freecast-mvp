@@ -38,7 +38,7 @@ model User {
   avatar          String?
   bio             String?
   phone           String?
-  address         String?   // NEW: Địa chỉ nhận hàng
+  address         String?   // Địa chỉ nhận hàng
   socialLink      String?   @map("social_link")
   isEmailVerified Boolean   @default(false) @map("is_email_verified")
   isBanned        Boolean   @default(false) @map("is_banned")
@@ -83,10 +83,10 @@ model Application {
   price       Float?
   status      ApplicationStatus @default(PENDING)
 
-  // --- NEW FIELDS FOR BOOKING FLOW ---
-  trackingCode     String?   @map("tracking_code") // Mã vận đơn
-  isProductReceived Boolean  @default(false) @map("is_product_received") // KOL xác nhận đã nhận hàng
-  submissionLink   String?   @map("submission_link") // Link bài đăng của KOL
+  // Booking Flow Data
+  trackingCode     String?   @map("tracking_code")
+  isProductReceived Boolean  @default(false) @map("is_product_received")
+  submissionLink   String?   @map("submission_link")
   
   campaignId  String            @map("campaign_id")
   campaign    Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
@@ -97,7 +97,7 @@ model Application {
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
 
-  review      Review?
+  reviews     Review[] 
   messages    ChatMessage[]
 
   @@map("applications")
@@ -109,7 +109,7 @@ model Review {
   rating        Int
   comment       String?
   
-  applicationId String   @unique @map("application_id")
+  applicationId String   @map("application_id")
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   authorId      String   @map("author_id")

@@ -1,7 +1,6 @@
 import { IsEmail, IsNotEmpty, IsString, MinLength, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-// Định nghĩa Role khớp với Prisma Schema
 export enum Role {
   ADMIN = 'ADMIN',
   BRAND = 'BRAND',
@@ -48,5 +47,7 @@ export class AuthResponseDto {
     email: string;
     fullName: string;
     role: Role;
+    avatar?: string | null;
   };
+  rating?: number;
 }
