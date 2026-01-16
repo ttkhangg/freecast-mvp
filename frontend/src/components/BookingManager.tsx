@@ -1,15 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import api from '@/utils/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { StarRating } from '@/components/ui/star-rating';
+// Sử dụng relative path
+import api from '../utils/api';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { StarRating } from './ui/star-rating';
 import { toast } from 'sonner';
-import { Truck, CheckCircle, Link as LinkIcon, Gift, Award, Package, Clock, ExternalLink, MapPin, Phone, User, Lock } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/store/useAuthStore';
+import { Truck, CheckCircle, Link as LinkIcon, Gift, Award, Package, Clock, ExternalLink, MapPin, Phone, User, Lock, Send, ChevronRight } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { useAuthStore } from '../store/useAuthStore';
 
 interface Props {
   application: any; 
@@ -50,9 +51,9 @@ export default function BookingManager({ application, isBrand, onRefresh }: Prop
 
   if (application.status === 'PENDING' && isBrand) {
       return (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center text-yellow-800 text-sm mt-4">
-              <Lock className="w-4 h-4 mr-2" />
-              <span>Thông tin liên hệ của KOL được bảo mật. Hãy <b>Duyệt đơn</b> để xem.</span>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 flex items-center justify-center text-yellow-800 text-sm font-medium shadow-sm">
+              <Lock className="w-5 h-5 mr-2 text-yellow-600" />
+              <span>Thông tin liên hệ được bảo mật. Vui lòng <b>Duyệt đơn</b> để bắt đầu hợp tác.</span>
           </div>
       )
   }
@@ -64,112 +65,141 @@ export default function BookingManager({ application, isBrand, onRefresh }: Prop
   const step3_submitted = !!application.submissionLink;
   const step4_completed = application.status === 'COMPLETED';
 
-  const TimelineStep = ({ active, completed, icon: Icon, title, children, last = false }: any) => (
-    <div className="relative pl-10 pb-8">
-      {!last && <div className={cn("absolute left-[15px] top-10 bottom-0 w-0.5 transition-colors duration-500", completed ? "bg-green-500" : "bg-gray-200")} />}
-      <div className={cn("absolute left-0 top-0 h-8 w-8 rounded-full flex items-center justify-center border-2 z-10 bg-white transition-all shadow-sm", completed ? "border-green-500 text-green-500 bg-green-50" : active ? "border-primary text-primary ring-4 ring-primary/20" : "border-gray-300 text-gray-300")}>
-        {completed ? <CheckCircle className="h-5 w-5" /> : <Icon className="h-4 w-4" />}
+  const StepIndicator = ({ active, completed, icon: Icon, title, children, last }: any) => (
+    <div className="relative pl-12 pb-8 last:pb-0">
+      {/* Line */}
+      {!last && (
+        <div className={cn(
+            "absolute left-[19px] top-10 bottom-0 w-0.5 transition-colors duration-500",
+            completed ? "bg-green-500" : "bg-slate-200"
+        )} />
+      )}
+      
+      {/* Circle Icon */}
+      <div className={cn(
+          "absolute left-0 top-0 h-10 w-10 rounded-full flex items-center justify-center border-2 z-10 bg-white transition-all shadow-sm", 
+          completed ? "border-green-500 text-white bg-green-500" : 
+          active ? "border-indigo-600 text-indigo-600 ring-4 ring-indigo-50" : 
+          "border-slate-200 text-slate-300"
+      )}>
+        {completed ? <CheckCircle className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
       </div>
-      <div>
-        <h4 className={cn("font-bold text-sm mb-2 uppercase tracking-wide", completed ? "text-green-700" : active ? "text-gray-900" : "text-gray-400")}>{title}</h4>
-        <div className="text-sm text-gray-600">{children}</div>
+
+      {/* Content */}
+      <div className={cn("transition-opacity duration-300", active || completed ? "opacity-100" : "opacity-50 blur-[0.5px]")}>
+        <h4 className={cn("font-bold text-sm mb-2 uppercase tracking-wide flex items-center", completed ? "text-green-700" : active ? "text-indigo-900" : "text-slate-400")}>
+            {title}
+            {completed && <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full normal-case">Hoàn thành</span>}
+        </h4>
+        <div className="text-sm text-slate-600 bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+            {children}
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm mt-4 animate-in fade-in zoom-in duration-300">
-      <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-4">
-        <h3 className="text-lg font-bold text-gray-900 flex items-center">
-          <Gift className="mr-2 h-5 w-5 text-primary" /> Tiến độ hợp tác
-        </h3>
-        <Badge variant={step4_completed ? "success" : "secondary"}>
-            {step4_completed ? "Đã hoàn thành" : "Đang thực hiện"}
-        </Badge>
-      </div>
-
-      <div className="ml-2">
-        <TimelineStep active={!step1_shipped} completed={step1_shipped} icon={Truck} title="1. Gửi sản phẩm">
-          {isBrand && !step1_shipped && (
-            <div className="bg-blue-50 p-3 rounded mb-3 border border-blue-100 text-sm">
-               <p className="font-semibold text-blue-800 mb-1 flex items-center"><User className="w-3 h-3 mr-1"/> Thông tin người nhận:</p>
-               <div className="pl-4 space-y-1 text-blue-700">
-                   <p>{application.kol.fullName}</p>
-                   <p className="flex items-center"><Phone className="w-3 h-3 mr-2"/> {application.kol.phone || 'Chưa cập nhật SĐT'}</p>
-                   <p className="flex items-center"><MapPin className="w-3 h-3 mr-2"/> {application.kol.address || 'Chưa cập nhật địa chỉ'}</p>
-               </div>
-            </div>
-          )}
-          {step1_shipped ? (
-            <div className="flex items-center text-gray-900 font-mono font-bold bg-gray-100 px-3 py-1.5 rounded w-fit border border-gray-200">
-              <Package className="mr-2 h-4 w-4 text-gray-500"/> {application.trackingCode}
-            </div>
-          ) : (
-            isBrand ? (
-              <div className="flex gap-2 max-w-sm">
-                <Input placeholder="Mã vận đơn..." value={inputValue} onChange={(e) => setInputValue(e.target.value)} className="h-9 bg-white" />
-                <Button size="sm" disabled={loading || !inputValue} onClick={() => handleAction(`/campaigns/application/${application.id}/tracking`, { trackingCode: inputValue }, 'Đã cập nhật')}>Xác nhận</Button>
-              </div>
-            ) : <p className="italic text-gray-400 flex items-center"><Clock className="w-3 h-3 mr-1"/> Chờ Brand gửi hàng...</p>
-          )}
-        </TimelineStep>
-
-        <TimelineStep active={step1_shipped && !step2_received} completed={step2_received} icon={Package} title="2. Nhận hàng">
-          {step2_received ? (
-            <p className="text-green-600 font-medium flex items-center"><CheckCircle className="w-4 h-4 mr-1"/> Đã nhận hàng thành công.</p>
-          ) : (
-            !isBrand && step1_shipped ? (
-              <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(`/campaigns/application/${application.id}/receive`, {}, 'Đã nhận hàng')}>
-                <CheckCircle className="mr-2 h-4 w-4"/> Xác nhận đã nhận
-              </Button>
-            ) : <p className="italic text-gray-400">{step1_shipped ? 'Chờ KOL xác nhận...' : 'Chưa gửi hàng'}</p>
-          )}
-        </TimelineStep>
-
-        <TimelineStep active={step2_received && !step3_submitted} completed={step3_submitted} icon={LinkIcon} title="3. Nộp bài đăng">
-          {step3_submitted ? (
-            <a href={application.submissionLink} target="_blank" className="text-primary hover:underline font-medium flex items-center bg-indigo-50 p-2 rounded w-fit border border-indigo-100">
-              <ExternalLink className="h-4 w-4 mr-2" /> Xem bài review
-            </a>
-          ) : (
-            !isBrand && step2_received ? (
-              <div className="flex gap-2 max-w-sm">
-                <Input placeholder="Link bài viết..." value={inputValue} onChange={(e) => setInputValue(e.target.value)} className="h-9 bg-white" />
-                <Button size="sm" disabled={loading || !inputValue} onClick={() => handleAction(`/campaigns/application/${application.id}/submit`, { link: inputValue }, 'Đã nộp bài')}>Nộp</Button>
-              </div>
-            ) : <p className="italic text-gray-400">{step2_received ? 'Chờ KOL nộp bài...' : 'Chưa nhận hàng'}</p>
-          )}
-        </TimelineStep>
-
-        <TimelineStep active={step3_submitted && !step4_completed} completed={step4_completed} icon={Award} title="4. Hoàn tất & Đánh giá" last={true}>
-          {step4_completed ? (
-            <div className="space-y-4">
-               <div className="text-green-700 font-bold bg-green-50 px-4 py-3 rounded-lg border border-green-200 shadow-sm flex items-center">
-                 <Award className="mr-2 h-5 w-5"/> Hợp tác thành công!
-               </div>
-               {!myReview ? (
-                   <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 shadow-sm animate-in fade-in">
-                      <h5 className="font-bold text-yellow-800 mb-2 text-sm uppercase">Đánh giá đối tác</h5>
-                      <div className="mb-3"><StarRating rating={rating} onRatingChange={setRating} size="lg" /></div>
-                      <Input placeholder="Viết nhận xét..." value={comment} onChange={(e) => setComment(e.target.value)} className="mb-2 bg-white" />
-                      <Button onClick={handleSubmitReview} disabled={loading || rating === 0} size="sm">Gửi đánh giá</Button>
+    <div className="max-w-3xl">
+      <div className="space-y-0">
+        
+        {/* STEP 1: SHIP */}
+        <StepIndicator active={!step1_shipped} completed={step1_shipped} icon={Truck} title="1. Gửi sản phẩm">
+          {isBrand && !step1_shipped ? (
+            <div className="space-y-3">
+               <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100 text-sm">
+                   <p className="font-semibold text-blue-800 mb-2 flex items-center"><User className="w-3 h-3 mr-1"/> Gửi đến:</p>
+                   <div className="pl-4 space-y-1 text-slate-700">
+                       <p className="font-medium">{application.kol.fullName}</p>
+                       <p className="flex items-center text-xs text-slate-500"><Phone className="w-3 h-3 mr-1"/> {application.kol.phone || 'Chưa cập nhật SĐT'}</p>
+                       <p className="flex items-center text-xs text-slate-500"><MapPin className="w-3 h-3 mr-1"/> {application.kol.address || 'Chưa cập nhật địa chỉ'}</p>
                    </div>
-               ) : (
-                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                       <p className="text-sm text-gray-600 font-medium mb-1">Đánh giá của bạn:</p>
-                       <StarRating rating={myReview.rating} readonly size="sm" />
-                       <p className="text-sm text-gray-500 mt-1 italic">"{myReview.comment}"</p>
-                   </div>
-               )}
+               </div>
+               <div className="flex gap-2">
+                <Input placeholder="Nhập mã vận đơn..." value={inputValue} onChange={(e) => setInputValue(e.target.value)} className="bg-white h-10" />
+                <Button disabled={loading || !inputValue} onClick={() => handleAction(`/campaigns/application/${application.id}/tracking`, { trackingCode: inputValue }, 'Đã cập nhật')} className="bg-indigo-600 hover:bg-indigo-700">
+                    Gửi hàng <Send className="w-4 h-4 ml-1"/>
+                </Button>
+              </div>
+            </div>
+          ) : step1_shipped ? (
+            <div className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-indigo-600"/>
+                <span className="font-mono font-bold text-lg text-slate-900">{application.trackingCode}</span>
+                <span className="text-xs text-slate-400 ml-auto">Đã cập nhật mã</span>
             </div>
           ) : (
-            isBrand && step3_submitted ? (
-              <Button className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white shadow-md" disabled={loading} onClick={() => handleAction(`/campaigns/application/${application.id}/complete`, {}, 'Hoàn tất')}>
-                <CheckCircle className="mr-2 h-4 w-4"/> Duyệt bài & Thanh toán
-              </Button>
-            ) : <p className="italic text-gray-400">Chờ hoàn tất...</p>
+            <p className="italic text-slate-400 flex items-center"><Clock className="w-4 h-4 mr-1"/> Brand đang chuẩn bị hàng...</p>
           )}
-        </TimelineStep>
+        </StepIndicator>
+
+        {/* STEP 2: RECEIVE */}
+        <StepIndicator active={step1_shipped && !step2_received} completed={step2_received} icon={Gift} title="2. Nhận hàng">
+          {!isBrand && step1_shipped && !step2_received ? (
+              <Button size="lg" className="w-full bg-indigo-600 hover:bg-indigo-700 shadow-md" disabled={loading} onClick={() => handleAction(`/campaigns/application/${application.id}/receive`, {}, 'Đã nhận hàng')}>
+                <CheckCircle className="mr-2 h-5 w-5"/> Xác nhận đã nhận được quà
+              </Button>
+          ) : step2_received ? (
+              <p className="text-green-600 font-medium flex items-center"><CheckCircle className="w-4 h-4 mr-2"/> KOL đã nhận được sản phẩm.</p>
+          ) : (
+              <p className="italic text-slate-400">Chờ hàng được giao đến...</p>
+          )}
+        </StepIndicator>
+
+        {/* STEP 3: SUBMIT */}
+        <StepIndicator active={step2_received && !step3_submitted} completed={step3_submitted} icon={LinkIcon} title="3. Nộp bài đăng">
+           {step3_submitted ? (
+            <div className="flex items-center justify-between">
+                <a href={application.submissionLink} target="_blank" className="text-indigo-600 hover:underline font-bold flex items-center truncate max-w-[200px] md:max-w-xs">
+                    <ExternalLink className="h-4 w-4 mr-2" /> Xem bài review
+                </a>
+                <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">Đã nộp</span>
+            </div>
+          ) : !isBrand && step2_received ? (
+            <div className="flex gap-2">
+                <Input placeholder="Dán link bài viết (TikTok/FB)..." value={inputValue} onChange={(e) => setInputValue(e.target.value)} className="bg-white h-10" />
+                <Button disabled={loading || !inputValue} onClick={() => handleAction(`/campaigns/application/${application.id}/submit`, { link: inputValue }, 'Đã nộp bài')} className="bg-pink-600 hover:bg-pink-700 text-white">
+                    Nộp bài
+                </Button>
+            </div>
+          ) : (
+             <p className="italic text-slate-400">Chờ KOL trải nghiệm và lên bài...</p>
+          )}
+        </StepIndicator>
+
+        {/* STEP 4: COMPLETE */}
+        <StepIndicator active={step3_submitted && !step4_completed} completed={step4_completed} icon={Award} title="4. Hoàn tất & Đánh giá" last={true}>
+           {step4_completed ? (
+             <div className="space-y-4">
+                {!myReview ? (
+                    <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100 shadow-sm">
+                       <h5 className="font-bold text-yellow-800 mb-2 text-sm uppercase flex items-center"><Award className="w-4 h-4 mr-1"/> Đánh giá đối tác</h5>
+                       <div className="mb-3 flex justify-center"><StarRating rating={rating} onRatingChange={setRating} size="lg" /></div>
+                       <Input placeholder="Nhận xét của bạn..." value={comment} onChange={(e) => setComment(e.target.value)} className="mb-3 bg-white" />
+                       <Button onClick={handleSubmitReview} disabled={loading || rating === 0} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white">Gửi đánh giá</Button>
+                    </div>
+                ) : (
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <p className="text-xs text-slate-500 font-bold uppercase mb-2">Đánh giá của bạn</p>
+                        <div className="flex items-center gap-2 mb-1">
+                            <StarRating rating={myReview.rating} readonly size="sm" />
+                            <span className="font-bold text-slate-700">{myReview.rating}/5</span>
+                        </div>
+                        <p className="text-sm text-slate-600 italic">"{myReview.comment}"</p>
+                    </div>
+                )}
+             </div>
+           ) : isBrand && step3_submitted ? (
+             <div className="text-center">
+                 <p className="text-slate-600 mb-3 text-sm">Hãy kiểm tra bài đăng của KOL trước khi hoàn tất.</p>
+                 <Button size="lg" className="w-full bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-200" disabled={loading} onClick={() => handleAction(`/campaigns/application/${application.id}/complete`, {}, 'Hoàn tất')}>
+                    <CheckCircle className="mr-2 h-5 w-5"/> Duyệt bài & Thanh toán
+                 </Button>
+             </div>
+           ) : (
+             <p className="italic text-slate-400">Chờ các bước trên hoàn tất...</p>
+           )}
+        </StepIndicator>
+
       </div>
     </div>
   );

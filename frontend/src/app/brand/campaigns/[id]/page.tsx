@@ -1,77 +1,72 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useCampaignDetail, useApproveApplication, useRejectApplication } from '@/hooks/useCampaigns';
-import DashboardLayout from '@/components/DashboardLayout';
-import AuthGuard from '@/components/AuthGuard';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import BookingManager from '@/components/BookingManager'; // Import Component mới
-import { Loader2, ArrowLeft, Check, X, MessageSquare, User, Users, Calendar, DollarSign } from 'lucide-react';
-import { CampaignStatus } from '@/types';
+// Sử dụng relative path
+import { useCampaignDetail, useApproveApplication, useRejectApplication } from '../../../../hooks/useCampaigns';
+import DashboardLayout from '../../../../components/DashboardLayout';
+import AuthGuard from '../../../../components/AuthGuard';
+import { Button } from '../../../../components/ui/button';
+import { Badge } from '../../../../components/ui/badge';
+import BookingManager from '../../../../components/BookingManager';
+import { Loader2, ArrowLeft, Check, X, MessageSquare, User, Users, Calendar, DollarSign, Filter, MoreHorizontal } from 'lucide-react';
+import { CampaignStatus } from '../../../../types';
+import { useState } from 'react';
+import { cn } from '../../../../lib/utils';
 
 export default function BrandCampaignManagePage() {
   const params = useParams();
   const id = params?.id as string;
   const router = useRouter();
 
-  // Hooks (Sử dụng hook data cũ nhưng thêm refetch để BookingManager gọi lại khi update)
   const { data: campaign, isLoading, error, refetch } = useCampaignDetail(id);
   const { mutate: approve, isPending: isApproving } = useApproveApplication();
   const { mutate: reject, isPending: isRejecting } = useRejectApplication();
+  
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL');
 
-  if (isLoading) {
-    return (
-      <DashboardLayout>
-        <div className="flex h-screen items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-        </div>
-      </DashboardLayout>
-    );
-  }
+  if (isLoading) return <DashboardLayout><div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div></DashboardLayout>;
+  if (error || !campaign) return <DashboardLayout><div className="text-center mt-20">Không tìm thấy chiến dịch</div></DashboardLayout>;
 
-  if (error || !campaign) {
-    return (
-      <DashboardLayout>
-        <div className="flex h-screen items-center justify-center flex-col">
-          <h2 className="text-xl font-bold text-gray-800">Không tìm thấy chiến dịch</h2>
-          <Button variant="link" onClick={() => router.push('/brand/campaigns')} className="mt-4">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Quay lại danh sách
-          </Button>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  // Lọc ứng viên
+  const applications = campaign.applications || [];
+  const filteredApps = applications.filter((app: any) => {
+      if (filterStatus === 'ALL') return true;
+      if (filterStatus === 'PENDING') return app.status === 'PENDING';
+      if (filterStatus === 'APPROVED') return ['APPROVED', 'COMPLETED'].includes(app.status);
+      return true;
+  });
 
-  const pendingCount = campaign.applications?.filter((a: any) => a.status === 'PENDING').length || 0;
-  const approvedCount = campaign.applications?.filter((a: any) => a.status === 'APPROVED' || a.status === 'COMPLETED').length || 0;
+  const pendingCount = applications.filter((a: any) => a.status === 'PENDING').length;
+  const approvedCount = applications.filter((a: any) => ['APPROVED', 'COMPLETED'].includes(a.status)).length;
 
   return (
     <AuthGuard allowedRoles={['BRAND']}>
       <DashboardLayout>
-        <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8 pb-20">
           
-          <div className="mb-6">
-            <button onClick={() => router.push('/brand/campaigns')} className="flex items-center text-sm text-gray-500 hover:text-indigo-600 transition-colors mb-4">
-              <ArrowLeft className="mr-1 h-4 w-4" /> Quay lại danh sách
+          {/* 1. Header Area */}
+          <div className="mb-8">
+            <button onClick={() => router.push('/brand/campaigns')} className="flex items-center text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors mb-4 group">
+              <ArrowLeft className="mr-1 h-4 w-4 group-hover:-translate-x-1 transition-transform" /> Quay lại danh sách
             </button>
             
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold text-gray-900">{campaign.title}</h1>
+                  <h1 className="text-2xl font-bold text-slate-900">{campaign.title}</h1>
                   <Badge variant={campaign.status === CampaignStatus.OPEN ? 'success' : 'secondary'}>
                     {campaign.status}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                  <span className="flex items-center"><DollarSign className="w-4 h-4 mr-1"/> {new Intl.NumberFormat('vi-VN').format(campaign.budget)} đ</span>
-                  <span className="flex items-center"><Calendar className="w-4 h-4 mr-1"/> Hạn: {new Date(campaign.deadline).toLocaleDateString('vi-VN')}</span>
+                <div className="flex items-center gap-6 mt-3 text-sm text-slate-500">
+                  <span className="flex items-center"><DollarSign className="w-4 h-4 mr-1 text-slate-400"/> {new Intl.NumberFormat('vi-VN').format(campaign.budget)} đ</span>
+                  <span className="flex items-center"><Calendar className="w-4 h-4 mr-1 text-slate-400"/> Hạn: {new Date(campaign.deadline).toLocaleDateString('vi-VN')}</span>
+                  <span className="flex items-center"><Users className="w-4 h-4 mr-1 text-slate-400"/> {applications.length} Ứng tuyển</span>
                 </div>
               </div>
               <div className="flex gap-3">
                 <Button variant="outline" size="sm" onClick={() => router.push(`/campaigns/${id}`)}>
-                  Xem bài đăng công khai
+                  Xem bài đăng Public
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => router.push(`/brand/campaigns/edit/${id}`)}>
                   Chỉnh sửa
@@ -80,103 +75,103 @@ export default function BrandCampaignManagePage() {
             </div>
           </div>
 
-          {/* Stats Bar */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <p className="text-sm font-medium text-gray-500">Tổng ứng viên</p>
-              <p className="text-2xl font-bold text-gray-900">{campaign.applications?.length || 0}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <p className="text-sm font-medium text-gray-500">Đang chờ duyệt</p>
-              <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <p className="text-sm font-medium text-gray-500">Đã tuyển (Approved)</p>
-              <p className="text-2xl font-bold text-green-600">{approvedCount}</p>
-            </div>
+          {/* 2. Filter & Stats Tabs */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6 border-b border-slate-200 pb-1">
+             <button 
+                onClick={() => setFilterStatus('ALL')}
+                className={cn("pb-3 text-sm font-medium border-b-2 transition-colors px-4", filterStatus === 'ALL' ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700")}
+             >
+                Tất cả ({applications.length})
+             </button>
+             <button 
+                onClick={() => setFilterStatus('PENDING')}
+                className={cn("pb-3 text-sm font-medium border-b-2 transition-colors px-4 flex items-center", filterStatus === 'PENDING' ? "border-yellow-500 text-yellow-600" : "border-transparent text-slate-500 hover:text-slate-700")}
+             >
+                Chờ duyệt <span className="ml-2 bg-yellow-100 text-yellow-700 text-[10px] px-2 py-0.5 rounded-full">{pendingCount}</span>
+             </button>
+             <button 
+                onClick={() => setFilterStatus('APPROVED')}
+                className={cn("pb-3 text-sm font-medium border-b-2 transition-colors px-4 flex items-center", filterStatus === 'APPROVED' ? "border-green-600 text-green-600" : "border-transparent text-slate-500 hover:text-slate-700")}
+             >
+                Đang hợp tác <span className="ml-2 bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full">{approvedCount}</span>
+             </button>
           </div>
 
-          <div className="space-y-6">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center">
-              <Users className="mr-2 h-5 w-5 text-indigo-600" />
-              Danh sách ứng viên
-            </h2>
-
-            <div className="space-y-6">
-              {campaign.applications?.map((app: any) => (
-                <div key={app.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center">
-                        <div className="h-12 w-12 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
-                          {app.kol.avatar ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={app.kol.avatar} alt={app.kol.fullName} className="h-full w-full object-cover" />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center text-gray-400"><User className="h-6 w-6" /></div>
-                          )}
-                        </div>
-                        <div className="ml-3">
-                          <h3 className="text-base font-bold text-gray-900">{app.kol.fullName}</h3>
-                          <div className="flex items-center text-xs text-gray-500 mt-0.5">
-                            <span>{app.kol.email}</span>
-                            {app.kol.phone && <span className="mx-1">• {app.kol.phone}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      <Badge variant={
-                        app.status === 'PENDING' ? 'warning' : 
-                        app.status === 'APPROVED' ? 'success' : 
-                        app.status === 'COMPLETED' ? 'default' : 'destructive'
-                      }>
-                        {app.status}
-                      </Badge>
-                    </div>
-                    
-                    <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600 mt-4 border border-gray-100">
-                      <p className="font-medium text-gray-700 text-xs uppercase tracking-wide mb-1">Lời nhắn:</p>
-                      <p className="italic">"{app.coverLetter || 'Tôi rất mong muốn được hợp tác.'}"</p> 
-                    </div>
-
-                    {/* KHU VỰC HÀNH ĐỘNG */}
-                    
-                    {/* 1. Nếu PENDING -> Hiện nút Duyệt/Từ chối */}
-                    {app.status === 'PENDING' && (
-                      <div className="mt-4 flex gap-3">
-                        <Button onClick={() => approve(app.id)} disabled={isApproving} className="flex-1 bg-green-600 hover:bg-green-700" size="sm">
-                          <Check className="mr-1.5 h-4 w-4" /> Duyệt hồ sơ
-                        </Button>
-                        <Button onClick={() => reject(app.id)} disabled={isRejecting} variant="destructive" size="sm" className="flex-1">
-                          <X className="mr-1.5 h-4 w-4" /> Từ chối
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* 2. Nếu APPROVED -> Hiện Booking Manager & Chat */}
-                    {(app.status === 'APPROVED' || app.status === 'COMPLETED') && (
-                      <div className="mt-6 border-t border-gray-100 pt-4">
-                        <div className="flex justify-between items-center mb-4">
-                           <h4 className="text-sm font-bold text-gray-900">Quản lý hợp tác</h4>
-                           <Button variant="outline" size="sm" onClick={() => router.push('/messages')} className="text-indigo-600 border-indigo-200 hover:bg-indigo-50">
-                              <MessageSquare className="mr-2 h-4 w-4" /> Chat ngay
-                           </Button>
-                        </div>
-                        
-                        {/* NHÚNG BOOKING MANAGER VÀO ĐÂY */}
-                        <BookingManager application={app} isBrand={true} onRefresh={refetch} />
-                      </div>
-                    )}
+          {/* 3. Applicant List */}
+          <div className="space-y-4">
+              {filteredApps.length === 0 ? (
+                  <div className="text-center py-20 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                      <Filter className="w-12 h-12 text-slate-300 mx-auto mb-3"/>
+                      <p className="text-slate-500">Không có ứng viên nào trong mục này.</p>
                   </div>
-                </div>
-              ))}
+              ) : (
+                  filteredApps.map((app: any) => (
+                    <div key={app.id} className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group">
+                      
+                      {/* Card Header Info */}
+                      <div className="p-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
+                          <div className="flex items-start gap-4">
+                             <div className="w-14 h-14 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
+                                {app.kol.avatar ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={app.kol.avatar} alt="avt" className="w-full h-full object-cover"/>
+                                ) : <div className="w-full h-full flex items-center justify-center text-slate-400"><User size={24}/></div>}
+                             </div>
+                             <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="text-lg font-bold text-slate-900">{app.kol.fullName}</h3>
+                                    <Badge variant={
+                                        app.status === 'PENDING' ? 'warning' : 
+                                        app.status === 'APPROVED' ? 'success' : 
+                                        app.status === 'COMPLETED' ? 'default' : 'destructive'
+                                    }>
+                                        {app.status}
+                                    </Badge>
+                                </div>
+                                <div className="text-sm text-slate-500 flex flex-wrap gap-x-4 gap-y-1">
+                                    <span>{app.kol.email}</span>
+                                    {app.kol.phone && <span>• {app.kol.phone}</span>}
+                                    <span className="text-indigo-600 font-medium cursor-pointer hover:underline">Xem hồ sơ chi tiết</span>
+                                </div>
+                                <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm italic text-slate-600 relative">
+                                    <span className="absolute -left-1 top-3 w-1 h-8 bg-indigo-200 rounded-r"></span>
+                                    "{app.coverLetter || 'Tôi rất mong muốn được hợp tác cùng Brand.'}"
+                                </div>
+                             </div>
+                          </div>
 
-              {(!campaign.applications || campaign.applications.length === 0) && (
-                <div className="text-center py-16 text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                  <p>Chưa có ai ứng tuyển.</p>
-                </div>
+                          {/* Action Buttons */}
+                          <div className="flex flex-col gap-2 min-w-[140px]">
+                              {app.status === 'PENDING' && (
+                                  <>
+                                    <Button onClick={() => approve(app.id)} disabled={isApproving} className="bg-green-600 hover:bg-green-700 text-white shadow-sm">
+                                        <Check className="w-4 h-4 mr-2"/> Duyệt
+                                    </Button>
+                                    <Button onClick={() => reject(app.id)} disabled={isRejecting} variant="destructive" className="bg-white text-red-600 border border-red-200 hover:bg-red-50">
+                                        <X className="w-4 h-4 mr-2"/> Từ chối
+                                    </Button>
+                                  </>
+                              )}
+                              {(app.status === 'APPROVED' || app.status === 'COMPLETED') && (
+                                  <Button onClick={() => router.push('/messages')} variant="outline" className="border-indigo-200 text-indigo-600 hover:bg-indigo-50">
+                                      <MessageSquare className="w-4 h-4 mr-2"/> Nhắn tin
+                                  </Button>
+                              )}
+                          </div>
+                      </div>
+
+                      {/* Booking Manager (Expandable) */}
+                      {(app.status === 'APPROVED' || app.status === 'COMPLETED') && (
+                          <div className="bg-slate-50 border-t border-slate-100 p-6">
+                              <h4 className="font-bold text-slate-800 mb-4 text-sm uppercase tracking-wide">Tiến độ công việc</h4>
+                              <BookingManager application={app} isBrand={true} onRefresh={refetch} />
+                          </div>
+                      )}
+                    </div>
+                  ))
               )}
-            </div>
           </div>
+
         </div>
       </DashboardLayout>
     </AuthGuard>

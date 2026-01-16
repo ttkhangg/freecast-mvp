@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,6 +12,7 @@ export class WsJwtGuard implements CanActivate {
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
+    private configService: ConfigService, // Inject ConfigService để lấy env chuẩn
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -21,20 +23,28 @@ export class WsJwtGuard implements CanActivate {
       client.handshake.auth?.token || client.handshake.headers?.authorization;
 
     if (!token) {
-      this.logger.error('No token provided');
-      throw new WsException('Unauthorized');
+      this.logger.error('No token provided in handshake');
+      throw new WsException('Unauthorized: No token provided');
     }
 
     try {
-      // Loại bỏ 'Bearer ' nếu có
-      const cleanToken = token.replace('Bearer ', '');
-      const payload = this.jwtService.verify(cleanToken, {
-        secret: process.env.JWT_SECRET,
+      // Loại bỏ 'Bearer ' nếu có để lấy raw token
+      const cleanToken = token.replace('Bearer ', '').trim();
+      
+      // FIX LỖI: Lấy JWT_SECRET chính xác từ môi trường
+      // Nếu không có env thì dùng chuỗi mặc định (chỉ dùng cho dev)
+      const secret = this.configService.get<string>('JWT_SECRET') || 'SuperSecretKeyForUnicornDev2026';
+
+      // Verify thủ công với secret key cụ thể
+      const payload = await this.jwtService.verifyAsync(cleanToken, {
+        secret: secret
       });
 
-      // Gắn user vào client socket để dùng sau này
+      // Gắn user vào client socket để dùng sau này (trong Gateway)
       const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+      
       if (!user) {
+        this.logger.warn(`User not found for ID: ${payload.sub}`);
         throw new WsException('User not found');
       }
 
@@ -42,8 +52,14 @@ export class WsJwtGuard implements CanActivate {
       client.user = user;
       return true;
     } catch (err) {
-      this.logger.error('Token invalid');
-      throw new WsException('Unauthorized');
+      // Log rõ lỗi ra để debug
+      this.logger.error(`Token verification failed: ${err.message}`);
+      
+      if (err.message === 'invalid signature') {
+         this.logger.warn('Critical: Chữ ký Token không khớp. Vui lòng kiểm tra JWT_SECRET trong .env');
+      }
+      
+      throw new WsException('Unauthorized: Invalid token');
     }
   }
 }

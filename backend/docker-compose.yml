@@ -8,9 +8,8 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: password123  # Đặt mật khẩu rõ ràng, dễ nhớ cho môi trường dev
       POSTGRES_DB: freecast_db
-
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always

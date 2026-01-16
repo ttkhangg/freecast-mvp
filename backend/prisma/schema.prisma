@@ -61,9 +61,12 @@ model Campaign {
   title       String
   description String
   requirements String?
-  budget      Float
+  budget      Float          // Nếu = 0 nghĩa là Tặng sản phẩm/Thương lượng
   deadline    DateTime?
   status      CampaignStatus @default(OPEN)
+  
+  // NEW: Album ảnh sản phẩm (V2.4)
+  images      String[]       @default([]) @map("images")
   
   brandId     String         @map("brand_id")
   brand       User           @relation(fields: [brandId], references: [id], onDelete: Cascade)

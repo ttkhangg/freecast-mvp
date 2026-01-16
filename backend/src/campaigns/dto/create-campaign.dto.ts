@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, Min, IsDateString, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, Min, IsDateString, IsOptional, IsEnum, IsArray } from 'class-validator';
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 
 export enum CampaignStatus {
@@ -24,14 +24,21 @@ export class CreateCampaignDto {
   @IsOptional()
   requirements?: string;
 
-  @ApiProperty({ example: 5000000 })
+  @ApiProperty({ example: 5000000, description: 'Nếu = 0 nghĩa là Tặng sản phẩm / Thương lượng' })
   @IsNumber()
-  @Min(0, { message: 'Ngân sách phải lớn hơn 0' })
+  @Min(0, { message: 'Ngân sách không được âm' })
   budget: number;
 
   @ApiProperty({ example: '2026-12-31T00:00:00.000Z' })
   @IsDateString({}, { message: 'Deadline phải là định dạng ngày tháng hợp lệ' })
   deadline: string;
+
+  // NEW: Album ảnh (V2.4)
+  @ApiProperty({ example: ['https://img1.com', 'https://img2.com'], required: false })
+  @IsArray()
+  @IsOptional()
+  @IsString({ each: true })
+  images?: string[];
 }
 
 export class UpdateCampaignDto extends PartialType(CreateCampaignDto) {
