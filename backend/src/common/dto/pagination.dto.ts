@@ -15,11 +15,6 @@ export class PaginationDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(50) // Giới hạn max 50 để bảo vệ server
+  @Max(50)
   take?: number = 10;
-
-  // Getter tính toán số bản ghi cần bỏ qua
-  get skip(): number {
-    return ((this.page || 1) - 1) * (this.take || 10);
-  }
 }

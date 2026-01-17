@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query } from '@nestjs/common';
 import { CampaignsService } from './campaigns.service';
 import { CreateCampaignDto, UpdateCampaignDto } from './dto/create-campaign.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -6,6 +6,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/dto/auth.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { PaginationDto } from '../common/dto/pagination.dto'; // Import DTO
 
 @ApiTags('Campaigns')
 @Controller('campaigns')
@@ -30,7 +31,6 @@ export class CampaignsController {
     return this.campaignsService.findMyCampaigns(req.user.id);
   }
 
-  // --- NEW ENDPOINT: Lấy danh sách việc làm của KOL ---
   @Get('kol/my-jobs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.KOL)
@@ -41,9 +41,9 @@ export class CampaignsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Lấy tất cả chiến dịch (Public)' })
-  findAll() {
-    return this.campaignsService.findAll();
+  @ApiOperation({ summary: 'Lấy tất cả chiến dịch (Public - Có phân trang)' })
+  findAll(@Query() paginationDto: PaginationDto) {
+    return this.campaignsService.findAll(paginationDto);
   }
 
   @Get(':id')
@@ -52,6 +52,7 @@ export class CampaignsController {
     return this.campaignsService.findOne(id);
   }
 
+  // ... (Giữ nguyên các method Patch, Delete, Apply, v.v. như file cũ)
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.BRAND)

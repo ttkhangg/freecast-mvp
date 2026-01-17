@@ -8,8 +8,10 @@ interface ChatBoxProps {
   applicationId: string;
   currentUserId: string;
   partnerName: string;
-  partnerAvatar?: string; // NEW: Thêm prop Avatar
+  partnerAvatar?: string | null;
 }
+
+const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || '';
 
 export default function ChatBox({ applicationId, currentUserId, partnerName, partnerAvatar }: ChatBoxProps) {
   const [messages, setMessages] = useState<any[]>([]);
@@ -18,13 +20,26 @@ export default function ChatBox({ applicationId, currentUserId, partnerName, par
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.get(`/chat/${applicationId}`).then(res => setMessages(res.data));
+    // Load history
+    api.get(`/chat/${applicationId}`).then(res => setMessages(res.data)).catch(console.error);
 
-    // LƯU Ý: Đổi thành process.env.NEXT_PUBLIC_API_URL khi deploy
-    const newSocket = io('http://localhost:4000'); 
+    if (!SOCKET_URL) return;
+
+    // Lấy token
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
+
+    const newSocket = io(SOCKET_URL, {
+        path: '/socket.io',
+        transports: ['websocket'],
+        auth: { token: `Bearer ${token}` },
+        reconnection: true,
+    });
+
     setSocket(newSocket);
 
-    newSocket.emit('joinRoom', applicationId);
+    newSocket.on('connect', () => {
+        newSocket.emit('joinRoom', { applicationId });
+    });
 
     newSocket.on('newMessage', (msg) => {
       setMessages((prev) => [...prev, msg]);
@@ -39,17 +54,28 @@ export default function ChatBox({ applicationId, currentUserId, partnerName, par
 
   const handleSend = () => {
     if (!input.trim() || !socket) return;
+    
+    // Optimistic UI
+    const tempMsg = {
+        id: Date.now().toString(),
+        content: input,
+        senderId: currentUserId,
+        createdAt: new Date().toISOString(),
+        sender: { id: currentUserId } 
+    };
+    setMessages(prev => [...prev, tempMsg]);
+    
     socket.emit('sendMessage', {
       applicationId,
-      senderId: currentUserId,
       content: input
     });
+    
     setInput('');
   };
 
   return (
     <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col h-[500px] animate-fade-in-up overflow-hidden">
-      {/* Header Chat - CÓ AVATAR */}
+      {/* Header */}
       <div className="p-4 border-b border-slate-100 bg-indigo-600 text-white flex items-center gap-3 shadow-sm">
         <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center overflow-hidden border-2 border-indigo-400 shrink-0">
             {partnerAvatar ? (
@@ -68,16 +94,15 @@ export default function ChatBox({ applicationId, currentUserId, partnerName, par
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-        {messages.map((msg) => {
+        {messages.map((msg, index) => {
           const isMe = msg.senderId === currentUserId;
-          const senderName = msg.sender?.brandProfile?.companyName || msg.sender?.kolProfile?.fullName || 'User';
-          const senderAvatar = msg.sender?.brandProfile?.logo || msg.sender?.kolProfile?.avatar;
+          const showAvatar = !isMe && (index === 0 || messages[index - 1].senderId !== msg.senderId);
 
           return (
-            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} gap-2`}>
+            <div key={msg.id || index} className={`flex ${isMe ? 'justify-end' : 'justify-start'} gap-2`}>
               {!isMe && (
-                 <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden shrink-0 mt-1">
-                    {senderAvatar ? <img src={senderAvatar} className="w-full h-full object-cover"/> : <User size={16} className="m-1 text-slate-400"/>}
+                 <div className={`w-8 h-8 rounded-full bg-slate-200 overflow-hidden shrink-0 mt-1 ${!showAvatar ? 'invisible' : ''}`}>
+                    {partnerAvatar ? <img src={partnerAvatar} className="w-full h-full object-cover" alt=""/> : <User size={16} className="m-1 text-slate-400"/>}
                  </div>
               )}
               <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[70%]`}>
@@ -105,12 +130,10 @@ export default function ChatBox({ applicationId, currentUserId, partnerName, par
           placeholder="Nhập tin nhắn..."
           className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 transition-all focus:bg-white"
         />
-        <button onClick={handleSend} className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-md">
+        <button onClick={handleSend} disabled={!input.trim()} className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-md disabled:opacity-50">
           <Send size={20} />
         </button>
       </div>
     </div>
   );
 }
-
-

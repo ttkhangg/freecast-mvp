@@ -38,7 +38,7 @@ model User {
   avatar          String?
   bio             String?
   phone           String?
-  address         String?   // Địa chỉ nhận hàng
+  address         String?
   socialLink      String?   @map("social_link")
   isEmailVerified Boolean   @default(false) @map("is_email_verified")
   isBanned        Boolean   @default(false) @map("is_banned")
@@ -54,6 +54,7 @@ model User {
 
   @@map("users")
   @@index([email])
+  @@index([role]) 
 }
 
 model Campaign {
@@ -61,11 +62,10 @@ model Campaign {
   title       String
   description String
   requirements String?
-  budget      Float          // Nếu = 0 nghĩa là Tặng sản phẩm/Thương lượng
+  budget      Float
   deadline    DateTime?
   status      CampaignStatus @default(OPEN)
   
-  // NEW: Album ảnh sản phẩm (V2.4)
   images      String[]       @default([]) @map("images")
   
   brandId     String         @map("brand_id")
@@ -78,6 +78,7 @@ model Campaign {
 
   @@map("campaigns")
   @@index([brandId])
+  @@index([status, createdAt]) 
 }
 
 model Application {
@@ -86,7 +87,6 @@ model Application {
   price       Float?
   status      ApplicationStatus @default(PENDING)
 
-  // Booking Flow Data
   trackingCode     String?   @map("tracking_code")
   isProductReceived Boolean  @default(false) @map("is_product_received")
   submissionLink   String?   @map("submission_link")
@@ -105,6 +105,9 @@ model Application {
 
   @@map("applications")
   @@unique([campaignId, kolId])
+  @@index([status])
+  @@index([kolId])
+  @@index([campaignId])
 }
 
 model Review {
@@ -124,6 +127,7 @@ model Review {
   createdAt     DateTime @default(now()) @map("created_at")
 
   @@map("reviews")
+  @@index([targetId])
 }
 
 model Notification {
@@ -136,6 +140,7 @@ model Notification {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("notifications")
+  @@index([userId, isRead])
 }
 
 model ChatMessage {
@@ -148,4 +153,5 @@ model ChatMessage {
   createdAt     DateTime    @default(now()) @map("created_at")
 
   @@map("chat_messages")
+  @@index([applicationId, createdAt])
 }

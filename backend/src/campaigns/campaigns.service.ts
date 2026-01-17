@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateCampaignDto, UpdateCampaignDto } from './dto/create-campaign.dto';
 import { CampaignStatus, ApplicationStatus, Prisma } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class CampaignsService {
@@ -12,14 +13,13 @@ export class CampaignsService {
   ) {}
 
   async create(userId: string, dto: CreateCampaignDto) {
-    // Ép kiểu input để tránh lỗi TS nếu Prisma Client chưa kịp cập nhật (dù npx prisma generate là giải pháp gốc)
     const data: Prisma.CampaignCreateInput = {
       title: dto.title,
       description: dto.description,
       requirements: dto.requirements,
       budget: dto.budget,
       deadline: dto.deadline,
-      // @ts-ignore: Bỏ qua lỗi TS tạm thời nếu chưa chạy npx prisma generate
+      // @ts-ignore
       images: dto.images || [], 
       status: CampaignStatus.OPEN,
       brand: { connect: { id: userId } }
@@ -28,15 +28,33 @@ export class CampaignsService {
     return this.prisma.campaign.create({ data });
   }
 
-  async findAll() {
-    return this.prisma.campaign.findMany({
-      where: { status: CampaignStatus.OPEN },
-      include: { 
-          brand: { select: { id: true, fullName: true, avatar: true } }, 
-          _count: { select: { applications: true } } 
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  // --- FIX LỖI: Thêm tham số query vào hàm ---
+  async findAll(query: PaginationDto) {
+    const { page = 1, take = 10 } = query;
+    const skip = (page - 1) * take;
+
+    const [data, total] = await Promise.all([
+      this.prisma.campaign.findMany({
+        where: { status: CampaignStatus.OPEN },
+        include: { 
+            brand: { select: { id: true, fullName: true, avatar: true } }, 
+            _count: { select: { applications: true } } 
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: Number(skip),
+        take: Number(take),
+      }),
+      this.prisma.campaign.count({ where: { status: CampaignStatus.OPEN } })
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page: Number(page),
+        lastPage: Math.ceil(total / take),
+      }
+    };
   }
 
   async findMyCampaigns(userId: string) {
@@ -80,17 +98,11 @@ export class CampaignsService {
     const campaign = await this.findOne(id);
     if (campaign.brandId !== userId) throw new ForbiddenException('Không có quyền');
     
-    // Sử dụng 'any' cho data update để tránh lỗi type nếu prisma client chưa sync
     const data: any = { 
         ...dto, 
         ...(dto.status && { status: dto.status as CampaignStatus }),
     };
-    
-    // Chỉ cập nhật images nếu có gửi lên
-    if (dto.images) {
-        data.images = dto.images;
-    }
-    
+    if (dto.images) data.images = dto.images;
     return this.prisma.campaign.update({ where: { id }, data });
   }
 
@@ -131,14 +143,12 @@ export class CampaignsService {
   async rejectApplication(applicationId: string, brandId: string) {
     const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.campaign.brandId !== brandId) throw new ForbiddenException('Không có quyền');
-    
     return this.prisma.application.update({ where: { id: applicationId }, data: { status: ApplicationStatus.REJECTED } });
   }
 
   async updateTracking(applicationId: string, brandId: string, trackingCode: string) {
     const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.campaign.brandId !== brandId) throw new ForbiddenException('Không có quyền');
-    
     const updated = await this.prisma.application.update({ where: { id: applicationId }, data: { trackingCode } });
     await this.notificationsService.create(app.kolId, `Sản phẩm cho "${app.campaign.title}" đã gửi. Mã: ${trackingCode}`, 'SHIPPING');
     return updated;
@@ -147,7 +157,6 @@ export class CampaignsService {
   async confirmProductReceived(applicationId: string, kolId: string) {
     const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.kolId !== kolId) throw new ForbiddenException('Không có quyền');
-    
     const updated = await this.prisma.application.update({ where: { id: applicationId }, data: { isProductReceived: true } });
     await this.notificationsService.create(app.campaign.brandId, `KOL đã nhận hàng cho chiến dịch "${app.campaign.title}"`, 'SHIPPING');
     return updated;
@@ -156,7 +165,6 @@ export class CampaignsService {
   async submitWork(applicationId: string, kolId: string, submissionLink: string) {
     const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.kolId !== kolId) throw new ForbiddenException('Không có quyền');
-    
     const updated = await this.prisma.application.update({ where: { id: applicationId }, data: { submissionLink } });
     await this.notificationsService.create(app.campaign.brandId, `KOL nộp bài cho chiến dịch "${app.campaign.title}"`, 'WORK');
     return updated;
@@ -165,7 +173,6 @@ export class CampaignsService {
   async completeJob(applicationId: string, brandId: string) {
     const app = await this.prisma.application.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!app || app.campaign.brandId !== brandId) throw new ForbiddenException('Không có quyền');
-    
     const updated = await this.prisma.application.update({ where: { id: applicationId }, data: { status: ApplicationStatus.COMPLETED } });
     await this.notificationsService.create(app.kolId, `Chiến dịch "${app.campaign.title}" hoàn tất.`, 'PAYMENT');
     return updated;
