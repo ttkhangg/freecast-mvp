@@ -6,19 +6,19 @@ import DashboardLayout from '@/components/DashboardLayout';
 import AuthGuard from '@/components/AuthGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useUploadImage, useUpdateProfile } from '@/hooks/useProfile';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Camera, Save, Loader2, User as UserIcon } from 'lucide-react';
+import { Camera, Save, User as UserIcon, Link as LinkIcon, Phone, FileText } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
 // Schema Validation
 const profileSchema = z.object({
   fullName: z.string().min(2, 'Họ tên quá ngắn').max(50),
   bio: z.string().optional(),
   phone: z.string().optional(),
-  // Cho phép chuỗi rỗng HOẶC url hợp lệ
   socialLink: z.union([z.string().url('Link không hợp lệ'), z.literal('')]).optional(),
 });
 
@@ -47,7 +47,6 @@ export default function ProfilePage() {
     },
   });
 
-  // Reset form khi user load xong
   useEffect(() => {
     if (user) {
       reset({
@@ -60,7 +59,6 @@ export default function ProfilePage() {
     }
   }, [user, reset]);
 
-  // Xử lý chọn ảnh
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -70,21 +68,17 @@ export default function ProfilePage() {
     }
   };
 
-  // Xử lý Submit
   const onSubmit = async (data: ProfileFormValues) => {
     let avatarUrl = user?.avatar;
 
-    // 1. Upload ảnh (nếu có chọn)
     if (selectedFile) {
       try {
         avatarUrl = await uploadImage(selectedFile);
       } catch (error) {
-        // Lỗi đã được hook xử lý toast
         return; 
       }
     }
 
-    // 2. Chuẩn bị data (Biến chuỗi rỗng thành undefined để backend không validate sai)
     const payload = {
       ...data,
       avatar: avatarUrl,
@@ -93,129 +87,144 @@ export default function ProfilePage() {
       phone: data.phone === '' ? undefined : data.phone,
     };
 
-    // 3. Gọi API
     updateProfile(payload);
   };
 
   return (
     <AuthGuard>
       <DashboardLayout>
-        <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          <div className="mb-8 border-b border-gray-200 pb-5">
-            <h2 className="text-2xl font-bold leading-7 text-gray-900">
-              Hồ sơ cá nhân
-            </h2>
-            <p className="mt-2 text-sm text-gray-500">
+        <div className="max-w-4xl mx-auto space-y-8 pb-20">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Hồ sơ cá nhân</h2>
+            <p className="text-muted-foreground mt-1">
               Quản lý thông tin hiển thị của bạn trên nền tảng FreeCast.
             </p>
           </div>
 
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-8">
-              
-              {/* Avatar Section */}
-              <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
-                <div className="relative group">
-                  <div className="h-28 w-28 rounded-full overflow-hidden border-4 border-gray-100 bg-gray-200 flex items-center justify-center">
-                    {previewAvatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={previewAvatar} alt="Avatar" className="h-full w-full object-cover" />
-                    ) : (
-                      <UserIcon className="h-12 w-12 text-gray-400" />
-                    )}
+          <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            {/* Cột trái: Avatar & Quick Stats */}
+            <div className="md:col-span-1 space-y-6">
+              <Card>
+                <CardContent className="pt-6 flex flex-col items-center text-center">
+                   <div className="relative group">
+                      <div className="h-32 w-32 rounded-full overflow-hidden border-4 border-background shadow-lg ring-2 ring-border">
+                        {previewAvatar ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={previewAvatar} alt="Avatar" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                        ) : (
+                          <div className="h-full w-full bg-secondary flex items-center justify-center">
+                             <UserIcon className="h-12 w-12 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <label 
+                        htmlFor="avatar-upload" 
+                        className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-all rounded-full cursor-pointer backdrop-blur-sm"
+                      >
+                        <Camera className="h-8 w-8" />
+                      </label>
+                      <input 
+                        id="avatar-upload" 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handleFileChange}
+                      />
+                   </div>
+                   
+                   <div className="mt-4">
+                      <h3 className="font-bold text-lg">{user?.fullName}</h3>
+                      <p className="text-sm text-muted-foreground capitalize">{user?.role.toLowerCase()}</p>
+                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Status Card (Ví dụ) */}
+              <Card className="bg-primary/5 border-primary/20">
+                  <CardHeader className="pb-2">
+                      <CardTitle className="text-base text-primary">Trạng thái tài khoản</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                      <div className="flex items-center gap-2 text-sm">
+                          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                          <span className="font-medium">Đang hoạt động</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">Tài khoản của bạn đã được xác minh email.</p>
+                  </CardContent>
+              </Card>
+            </div>
+
+            {/* Cột phải: Form thông tin */}
+            <div className="md:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Thông tin cơ bản</CardTitle>
+                  <CardDescription>Cập nhật tên, liên hệ và giới thiệu về bản thân.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="fullName">Họ và tên</Label>
+                    <div className="relative">
+                        <UserIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input id="fullName" className="pl-9" {...register('fullName')} />
+                    </div>
+                    {errors.fullName && <p className="text-xs text-destructive">{errors.fullName.message}</p>}
                   </div>
-                  <label 
-                    htmlFor="avatar-upload" 
-                    className="absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer"
-                  >
-                    <Camera className="h-8 w-8" />
-                  </label>
-                  <input 
-                    id="avatar-upload" 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleFileChange}
-                  />
-                </div>
-                
-                <div className="flex-1 text-center sm:text-left">
-                  <h3 className="text-lg font-medium text-gray-900">Ảnh đại diện</h3>
-                  <p className="text-sm text-gray-500 mt-1 mb-4">
-                    Cho phép JPG, GIF hoặc PNG. Tối đa 5MB.
-                  </p>
-                  <div className="flex gap-2 justify-center sm:justify-start">
-                    <label htmlFor="avatar-upload">
-                      <span className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
-                        Thay đổi
-                      </span>
-                    </label>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="phone">Số điện thoại</Label>
+                    <div className="relative">
+                        <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input id="phone" className="pl-9" {...register('phone')} placeholder="0912..." />
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Form Fields */}
-              <div className="border-t border-gray-100 pt-8 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                
-                <div className="sm:col-span-3">
-                  <Label htmlFor="fullName">Họ và tên</Label>
-                  <Input 
-                    id="fullName" 
-                    {...register('fullName')} 
-                    className={errors.fullName ? "border-red-500" : ""}
-                  />
-                  {errors.fullName && <p className="mt-1 text-sm text-red-500">{errors.fullName.message}</p>}
-                </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="bio">Giới thiệu (Bio)</Label>
+                    <div className="relative">
+                        <FileText className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <textarea
+                            id="bio"
+                            rows={4}
+                            {...register('bio')}
+                            className="flex w-full rounded-lg border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            placeholder="Hãy viết gì đó ấn tượng về bạn..."
+                        />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-                <div className="sm:col-span-3">
-                  <Label htmlFor="phone">Số điện thoại</Label>
-                  <Input 
-                    id="phone" 
-                    {...register('phone')} 
-                    placeholder="0912..."
-                  />
-                </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Mạng xã hội</CardTitle>
+                  <CardDescription>Kết nối các nền tảng khác để tăng độ uy tín.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                   <div className="grid gap-2">
+                    <Label htmlFor="socialLink">Link Facebook / TikTok / Website</Label>
+                    <div className="relative">
+                        <LinkIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                            id="socialLink" 
+                            className="pl-9"
+                            {...register('socialLink')} 
+                            placeholder="https://..."
+                        />
+                    </div>
+                    {errors.socialLink && <p className="text-xs text-destructive">{errors.socialLink.message}</p>}
+                  </div>
+                </CardContent>
+                <CardFooter className="border-t bg-muted/20 py-4 flex justify-end">
+                    <Button type="submit" disabled={isUploading || isUpdating} isLoading={isUploading || isUpdating} size="lg">
+                        <Save className="mr-2 h-4 w-4" /> Lưu thay đổi
+                    </Button>
+                </CardFooter>
+              </Card>
+            </div>
 
-                <div className="sm:col-span-6">
-                  <Label htmlFor="bio">Giới thiệu bản thân (Bio)</Label>
-                  <textarea
-                    id="bio"
-                    rows={4}
-                    {...register('bio')}
-                    className="flex w-full rounded-md border border-gray-300 bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                    placeholder="Hãy viết gì đó ấn tượng về bạn..."
-                  />
-                </div>
-
-                <div className="sm:col-span-6">
-                  <Label htmlFor="socialLink">Link Mạng xã hội</Label>
-                  <Input 
-                    id="socialLink" 
-                    {...register('socialLink')} 
-                    placeholder="https://facebook.com/..."
-                    className={errors.socialLink ? "border-red-500" : ""}
-                  />
-                  {errors.socialLink && <p className="mt-1 text-sm text-red-500">{errors.socialLink.message}</p>}
-                </div>
-              </div>
-
-              <div className="pt-5 border-t border-gray-100 flex justify-end">
-                <Button type="submit" disabled={isUploading || isUpdating} className="w-full sm:w-auto">
-                  {(isUploading || isUpdating) ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Đang lưu...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" /> Lưu thay đổi
-                    </>
-                  )}
-                </Button>
-              </div>
-
-            </form>
-          </div>
+          </form>
         </div>
       </DashboardLayout>
     </AuthGuard>

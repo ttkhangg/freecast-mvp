@@ -2,6 +2,9 @@
 module.exports = {
   darkMode: ["class"],
   content: [
+    './src/pages/**/*.{ts,tsx}',
+    './src/components/**/*.{ts,tsx}',
+    './src/app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
   ],
   theme: {
@@ -13,6 +16,9 @@ module.exports = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-inter)", "sans-serif"], // Đảm bảo bạn đã load font Inter trong layout
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -47,6 +53,26 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Semantic Colors
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        // Sidebar specific (cho layout Dashboard)
+        sidebar: {
+          DEFAULT: "hsl(var(--background))",
+          foreground: "hsl(var(--foreground))",
+          primary: "hsl(var(--primary))",
+          'primary-foreground': "hsl(var(--primary-foreground))",
+          accent: "hsl(var(--accent))",
+          'accent-foreground': "hsl(var(--accent-foreground))",
+          border: "hsl(var(--border))",
+          ring: "hsl(var(--ring))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -62,10 +88,20 @@ module.exports = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "fade-in": {
+          from: { opacity: 0 },
+          to: { opacity: 1 },
+        },
+        "slide-in-from-right": {
+          from: { transform: "translateX(100%)" },
+          to: { transform: "translateX(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.3s ease-in-out",
+        "slide-in-right": "slide-in-from-right 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
       },
     },
   },
