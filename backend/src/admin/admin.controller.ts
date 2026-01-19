@@ -9,7 +9,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 @ApiTags('Admin')
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN) // CHỈ ADMIN MỚI VÀO ĐƯỢC
+@Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
@@ -20,21 +20,37 @@ export class AdminController {
     return this.adminService.getStats();
   }
 
+  @Get('activity')
+  @ApiOperation({ summary: 'Lấy hoạt động gần đây' })
+  getActivity() {
+      return this.adminService.getRecentActivities();
+  }
+
   @Get('users')
-  @ApiOperation({ summary: 'Lấy danh sách người dùng (Phân trang)' })
-  getUsers(@Query('page', new ParseIntPipe({ optional: true })) page: number = 1) {
-    return this.adminService.findAllUsers(page);
+  @ApiOperation({ summary: 'Quản lý Users' })
+  getUsers(
+      @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+      @Query('search') search?: string
+  ) {
+    return this.adminService.findAllUsers(page, search);
   }
 
   @Patch('users/:id/ban')
-  @ApiOperation({ summary: 'Khóa/Mở khóa tài khoản' })
   banUser(@Param('id') id: string) {
     return this.adminService.toggleBan(id);
   }
 
   @Patch('users/:id/verify')
-  @ApiOperation({ summary: 'Duyệt xác minh tài khoản' })
   verifyUser(@Param('id') id: string) {
     return this.adminService.verifyUser(id);
+  }
+
+  @Get('campaigns')
+  @ApiOperation({ summary: 'Quản lý Campaigns toàn hệ thống' })
+  getCampaigns(
+      @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+      @Query('search') search?: string
+  ) {
+      return this.adminService.findAllCampaigns(page, search);
   }
 }

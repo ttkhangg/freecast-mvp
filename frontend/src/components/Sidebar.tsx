@@ -14,7 +14,10 @@ import {
   PlusCircle, 
   Hexagon,
   LogIn,
-  Search
+  Search,
+  Users,
+  ShieldAlert,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
@@ -30,29 +33,40 @@ export default function Sidebar() {
   };
 
   // Logic phân quyền Menu
-  const navItems = [
+  let navItems = [
     { 
       name: user?.role === Role.KOL ? 'Sàn việc làm' : 'Tổng quan', 
       href: '/dashboard', 
       icon: user?.role === Role.KOL ? Search : LayoutDashboard 
-    },
-    { 
-      name: user?.role === Role.BRAND ? 'Quản lý Job' : 'Việc của tôi', 
-      href: user?.role === Role.BRAND ? '/brand/campaigns' : '/my-jobs', 
-      icon: Briefcase 
-    },
-    { name: 'Tin nhắn', href: '/messages', icon: MessageSquare },
-    { name: 'Hồ sơ', href: '/profile', icon: User },
+    }
   ];
 
+  if (user?.role === Role.BRAND) {
+      navItems.push({ name: 'Quản lý Job', href: '/brand/campaigns', icon: Briefcase });
+  } else if (user?.role === Role.KOL) {
+      navItems.push({ name: 'Việc của tôi', href: '/my-jobs', icon: Briefcase });
+  }
+
+  // --- ADMIN SECTION ---
   if (user?.role === Role.ADMIN) {
-      navItems.push({ name: 'Quản trị Users', href: '/admin/users', icon: Settings });
+      navItems = [
+          { name: 'Command Center', href: '/admin', icon: LayoutDashboard },
+          { name: 'Users', href: '/admin/users', icon: Users },
+          { name: 'Campaigns', href: '/admin/campaigns', icon: Briefcase }, // NEW
+          // { name: 'Reports', href: '/admin/reports', icon: ShieldAlert }, // Placeholder
+      ];
+  } else {
+      // Common items for non-admin
+      navItems.push(
+        { name: 'Tin nhắn', href: '/messages', icon: MessageSquare },
+        { name: 'Hồ sơ', href: '/profile', icon: User },
+      );
   }
 
   return (
-    <aside className="flex flex-col w-64 bg-sidebar border-r border-sidebar-border min-h-screen transition-all duration-300 shadow-sm z-20">
+    <aside className="flex flex-col w-64 bg-sidebar border-r border-sidebar-border min-h-screen transition-all duration-300 shadow-sm z-20 sticky top-0 h-screen">
       {/* Brand Logo */}
-      <div className="flex items-center h-16 px-6 border-b border-sidebar-border">
+      <div className="flex items-center h-16 px-6 border-b border-sidebar-border shrink-0">
         <Link href="/" className="flex items-center gap-2 group">
           <div className="bg-primary p-1.5 rounded-lg group-hover:scale-105 transition-transform">
              <Hexagon className="w-5 h-5 text-white fill-white" />
@@ -63,7 +77,7 @@ export default function Sidebar() {
       
       {/* User Quick Info */}
       {isAuthenticated && user ? (
-        <div className="px-4 py-6">
+        <div className="px-4 py-6 shrink-0">
           <div className="flex items-center gap-3 p-3 rounded-xl bg-sidebar-accent/50 border border-sidebar-border">
             <div className="flex-shrink-0">
               {user.avatar ? (
@@ -90,7 +104,7 @@ export default function Sidebar() {
           )}
         </div>
       ) : (
-          <div className="p-4">
+          <div className="p-4 shrink-0">
               <Button onClick={() => router.push('/login')} className="w-full">
                   <LogIn className="w-4 h-4 mr-2"/> Đăng nhập
               </Button>
@@ -99,9 +113,9 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <div className="flex-1 flex flex-col gap-1 px-3 py-2 overflow-y-auto no-scrollbar">
-        <p className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Menu</p>
+        <p className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-2">Menu</p>
         {isAuthenticated && navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+          const isActive = pathname === item.href || (item.href !== '/dashboard' && item.href !== '/admin' && pathname?.startsWith(item.href));
           return (
             <Link
               key={item.href}
@@ -109,7 +123,7 @@ export default function Sidebar() {
               className={cn(
                 "flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 group",
                 isActive
-                  ? "bg-primary/10 text-primary font-bold"
+                  ? "bg-primary/10 text-primary font-bold shadow-sm"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
@@ -122,7 +136,7 @@ export default function Sidebar() {
 
       {/* Footer / Logout */}
       {isAuthenticated && (
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="p-4 border-t border-sidebar-border shrink-0">
             <button 
                 onClick={handleLogout} 
                 className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-muted-foreground rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all"
