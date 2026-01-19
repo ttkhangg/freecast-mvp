@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import api from '@/utils/api';
 import DashboardLayout from '@/components/DashboardLayout';
-import { Search, Loader2, Calendar, User, Eye } from 'lucide-react';
+import { Search, Loader2, Calendar, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 
@@ -15,7 +15,14 @@ export default function AdminCampaignsPage() {
   const fetchCampaigns = () => {
     setLoading(true);
     api.get(`/admin/campaigns?page=${page}&search=${search}`)
-       .then(res => setData(res.data))
+       .then(res => {
+         // FIX: API Interceptor đã unwrap data rồi, không cần res.data nữa
+         setData(res); 
+       })
+       .catch(err => {
+         console.error("Failed to fetch campaigns:", err);
+         setData(null);
+       })
        .finally(() => setLoading(false));
   };
 
@@ -67,46 +74,54 @@ export default function AdminCampaignsPage() {
                         <th className="p-4 text-slate-500 font-medium text-xs uppercase tracking-wider text-right">Thao tác</th>
                     </tr>
                 </thead>
+                {/* Safe check data?.data trước khi map */}
                 <tbody className="divide-y divide-slate-50">
-                    {data?.data.map((c: any) => (
-                        <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="p-4">
-                                <div className="font-semibold text-slate-900 line-clamp-1 max-w-[250px]">{c.title}</div>
-                                <div className="text-xs text-slate-500 flex items-center mt-1">
-                                    <Calendar className="w-3 h-3 mr-1"/> {new Date(c.createdAt).toLocaleDateString('vi-VN')}
-                                </div>
-                            </td>
-                            <td className="p-4">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                                        {c.brand.fullName[0]}
+                    {data?.data?.length > 0 ? (
+                        data.data.map((c: any) => (
+                            <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4">
+                                    <div className="font-semibold text-slate-900 line-clamp-1 max-w-[250px]">{c.title}</div>
+                                    <div className="text-xs text-slate-500 flex items-center mt-1">
+                                        <Calendar className="w-3 h-3 mr-1"/> {new Date(c.createdAt).toLocaleDateString('vi-VN')}
                                     </div>
-                                    <div className="text-sm text-slate-700">{c.brand.fullName}</div>
-                                </div>
-                            </td>
-                            <td className="p-4">
-                                <div className="text-sm font-medium text-slate-700">{c._count.applications}</div>
-                            </td>
-                            <td className="p-4">
-                                <Badge variant={getStatusColor(c.status)}>{c.status}</Badge>
-                            </td>
-                            <td className="p-4 text-right">
-                                <Link href={`/campaigns/${c.id}`} target="_blank">
-                                    <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Xem chi tiết">
-                                        <Eye size={18}/>
-                                    </button>
-                                </Link>
-                                {/* Future: Add Delete/Ban buttons here */}
+                                </td>
+                                <td className="p-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                                            {c.brand.fullName?.[0] || 'B'}
+                                        </div>
+                                        <div className="text-sm text-slate-700">{c.brand.fullName}</div>
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <div className="text-sm font-medium text-slate-700">{c._count?.applications || 0}</div>
+                                </td>
+                                <td className="p-4">
+                                    <Badge variant={getStatusColor(c.status)}>{c.status}</Badge>
+                                </td>
+                                <td className="p-4 text-right">
+                                    <Link href={`/campaigns/${c.id}`} target="_blank">
+                                        <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Xem chi tiết">
+                                            <Eye size={18}/>
+                                        </button>
+                                    </Link>
+                                </td>
+                            </tr>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan={5} className="p-8 text-center text-muted-foreground text-sm">
+                                Không tìm thấy dữ liệu.
                             </td>
                         </tr>
-                    ))}
+                    )}
                 </tbody>
             </table>
         )}
       </div>
       
       {/* Pagination */}
-      {data && data.meta.lastPage > 1 && (
+      {data && data.meta && data.meta.lastPage > 1 && (
         <div className="flex gap-2 mt-6 justify-end items-center">
             <button disabled={page===1} onClick={() => setPage(page-1)} className="px-3 py-1.5 bg-white border rounded-lg disabled:opacity-50 hover:bg-slate-50 text-sm">Trước</button>
             <span className="text-sm text-slate-600 font-medium">Trang {data.meta.page} / {data.meta.lastPage}</span>

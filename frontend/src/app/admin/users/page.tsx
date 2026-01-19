@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import api from '@/utils/api';
 import DashboardLayout from '@/components/DashboardLayout';
-import { Check, X, ShieldAlert, ChevronLeft, ChevronRight, Search, Loader2, Ban, Unlock } from 'lucide-react';
+import { Check, X, ChevronLeft, ChevronRight, Search, Loader2, Ban, Unlock } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function UserManagement() {
   const [data, setData] = useState<any>(null);
@@ -13,7 +14,14 @@ export default function UserManagement() {
   const fetchUsers = () => {
     setLoading(true);
     api.get(`/admin/users?page=${page}&search=${search}`)
-       .then(res => setData(res.data))
+       .then(res => {
+          // FIX: API Interceptor đã unwrap data
+          setData(res);
+       })
+       .catch(err => {
+          console.error(err);
+          toast.error("Lỗi tải danh sách người dùng");
+       })
        .finally(() => setLoading(false));
   };
 
@@ -23,15 +31,20 @@ export default function UserManagement() {
   }, [page, search]);
 
   const handleVerify = async (id: string) => {
-    await api.patch(`/admin/users/${id}/verify`);
-    fetchUsers(); 
+    try {
+        await api.patch(`/admin/users/${id}/verify`);
+        toast.success("Đã xác thực user");
+        fetchUsers(); 
+    } catch (e) { toast.error("Lỗi"); }
   };
 
-  // FIX TECH DEBT #4: Logic Ban riêng biệt
   const handleBan = async (id: string) => {
-    if(!confirm("Bạn có chắc chắn muốn khóa/mở khóa tài khoản này?")) return;
-    await api.patch(`/admin/users/${id}/ban`);
-    fetchUsers();
+    if(!confirm("Bạn có chắc chắn muốn thay đổi trạng thái chặn?")) return;
+    try {
+        await api.patch(`/admin/users/${id}/ban`);
+        toast.success("Cập nhật trạng thái thành công");
+        fetchUsers();
+    } catch (e) { toast.error("Lỗi"); }
   };
 
   return (
@@ -64,11 +77,12 @@ export default function UserManagement() {
                     </tr>
                 </thead>
                 <tbody>
-                    {data?.data.map((u: any) => (
-                        <tr key={u.id} className={`border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors ${u.isBanned ? 'bg-red-50' : ''}`}>
+                    {data?.data?.length > 0 ? (
+                        data.data.map((u: any) => (
+                        <tr key={u.id} className={`border-b last:border-0 border-slate-50 hover:bg-slate-50/50 transition-colors ${u.isBanned ? 'bg-red-50/50' : ''}`}>
                             <td className="p-4">
                                 <div className="font-medium text-slate-900">{u.email}</div>
-                                <div className="text-xs text-slate-500">{u.role === 'BRAND' ? u.brandProfile?.companyName : u.kolProfile?.fullName || '---'}</div>
+                                <div className="text-xs text-slate-500">{u.fullName || '---'}</div>
                             </td>
                             <td className="p-4">
                                 <span className={`px-2 py-1 rounded text-xs font-bold ${
@@ -87,30 +101,30 @@ export default function UserManagement() {
                             </td>
                             <td className="p-4 text-right">
                                 <div className="flex justify-end gap-2">
-                                    {/* Nút Verify */}
                                     <button onClick={() => handleVerify(u.id)} className={`p-2 rounded-lg transition-colors ${u.isVerified ? 'text-slate-400 hover:bg-slate-100' : 'text-green-600 bg-green-50 hover:bg-green-100'}`} title={u.isVerified ? "Hủy xác minh" : "Xác minh"}>
                                         {u.isVerified ? <X size={16}/> : <Check size={16}/>}
                                     </button>
                                     
-                                    {/* FIX #4: Nút Ban riêng biệt */}
                                     <button onClick={() => handleBan(u.id)} className={`p-2 rounded-lg transition-colors ${u.isBanned ? 'text-green-600 bg-green-50 hover:bg-green-100' : 'text-red-600 bg-red-50 hover:bg-red-100'}`} title={u.isBanned ? "Mở khóa" : "Chặn tài khoản"}>
                                         {u.isBanned ? <Unlock size={16}/> : <Ban size={16}/>}
                                     </button>
                                 </div>
                             </td>
                         </tr>
-                    ))}
+                    ))
+                   ) : (
+                       <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">Không có dữ liệu</td></tr>
+                   )}
                 </tbody>
             </table>
         )}
       </div>
       
-      {/* Pagination */}
-      {data && (
+      {data && data.meta && (
         <div className="flex gap-2 mt-6 justify-end items-center">
             <button disabled={page===1} onClick={() => setPage(page-1)} className="p-2 bg-white border rounded-lg disabled:opacity-50 hover:bg-slate-50 text-slate-600"><ChevronLeft size={20}/></button>
             <span className="text-sm text-slate-600">Trang {data.meta.page}</span>
-            <button disabled={page===data.meta.last_page} onClick={() => setPage(page+1)} className="p-2 bg-white border rounded-lg disabled:opacity-50 hover:bg-slate-50 text-slate-600"><ChevronRight size={20}/></button>
+            <button disabled={page===data.meta.lastPage} onClick={() => setPage(page+1)} className="p-2 bg-white border rounded-lg disabled:opacity-50 hover:bg-slate-50 text-slate-600"><ChevronRight size={20}/></button>
         </div>
       )}
     </DashboardLayout>

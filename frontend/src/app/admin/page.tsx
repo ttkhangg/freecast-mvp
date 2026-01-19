@@ -2,22 +2,21 @@
 import { useEffect, useState } from 'react';
 import api from '@/utils/api';
 import DashboardLayout from '@/components/DashboardLayout';
-import { Users, LayoutGrid, FileText, TrendingUp, DollarSign, Activity, AlertCircle, Loader2, Clock } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import Link from 'next/link';
+import { Users, LayoutGrid, FileText, DollarSign, Activity, AlertCircle, Loader2, Clock, TrendingUp } from 'lucide-react';
+import { AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area } from 'recharts';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
 
   useEffect(() => {
-    // Parallel Fetching
+    // FIX: Không dùng .data vì api utils đã handle rồi
     Promise.all([
         api.get('/admin/stats'),
         api.get('/admin/activity')
     ]).then(([statsRes, actRes]) => {
-        setStats(statsRes.data);
-        setActivities(actRes.data);
+        setStats(statsRes);
+        setActivities(actRes as any[]); 
     }).catch(console.error);
   }, []);
 
@@ -33,7 +32,6 @@ export default function AdminDashboard() {
     <DashboardLayout>
       <div className="space-y-8 pb-10">
         
-        {/* Header */}
         <div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Command Center</h1>
             <p className="text-slate-500 mt-1">Báo cáo hiệu suất & Sức khỏe hệ thống.</p>
@@ -44,21 +42,21 @@ export default function AdminDashboard() {
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-all">
              <div>
                 <p className="text-sm font-medium text-slate-500 mb-1">Tổng User</p>
-                <p className="text-3xl font-bold text-slate-900">{stats.totalUsers.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-slate-900">{stats.totalUsers?.toLocaleString()}</p>
              </div>
              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Users size={24}/></div>
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-all">
              <div>
                 <p className="text-sm font-medium text-slate-500 mb-1">Active Campaigns</p>
-                <p className="text-3xl font-bold text-slate-900">{stats.activeCampaigns.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-slate-900">{stats.activeCampaigns?.toLocaleString()}</p>
              </div>
              <div className="p-3 bg-purple-50 text-purple-600 rounded-xl"><LayoutGrid size={24}/></div>
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-all">
              <div>
                 <p className="text-sm font-medium text-slate-500 mb-1">Tổng Applications</p>
-                <p className="text-3xl font-bold text-slate-900">{stats.totalApplications.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-slate-900">{stats.totalApplications?.toLocaleString()}</p>
              </div>
              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><FileText size={24}/></div>
           </div>
@@ -105,7 +103,7 @@ export default function AdminDashboard() {
                     <Activity size={20} className="text-emerald-600"/> Hoạt động gần đây
                 </h3>
                 <div className="space-y-4">
-                    {activities.length > 0 ? activities.map((act, i) => (
+                    {activities && activities.length > 0 ? activities.map((act, i) => (
                         <div key={i} className="flex gap-3 items-start border-b border-slate-50 last:border-0 pb-3 last:pb-0">
                             <div className="w-2 h-2 mt-1.5 rounded-full bg-indigo-500 shrink-0 animate-pulse"></div>
                             <div>
