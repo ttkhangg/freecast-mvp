@@ -8,18 +8,29 @@ import { User, Mail, Lock, Building2, Star, ArrowLeft } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({ email: '', password: '', name: '', role: 'BRAND' });
+  
+  // FIX: Đổi 'name' thành 'fullName' để khớp với Backend DTO
+  const [formData, setFormData] = useState({ 
+    email: '', 
+    password: '', 
+    fullName: '', 
+    role: 'BRAND' 
+  });
+  
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
+      // Payload gửi đi sẽ là { email, password, fullName, role } -> Backend 201 Created
       await api.post('/auth/register', formData);
       alert('Đăng ký thành công! Đang chuyển hướng...');
       router.push('/login');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Lỗi đăng ký. Vui lòng thử lại.');
+      // Hiển thị lỗi chi tiết từ Backend nếu có
+      const message = err.message || (Array.isArray(err.message) ? err.message.join(', ') : 'Lỗi đăng ký');
+      alert(message || 'Lỗi đăng ký. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -70,12 +81,13 @@ export default function RegisterPage() {
           <div className="space-y-4">
             <div className="relative group">
               <User className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={20} />
+              {/* FIX: Input cập nhật vào fullName */}
               <input 
                 type="text" 
                 placeholder={formData.role === 'BRAND' ? "Tên Doanh Nghiệp / Shop" : "Họ và Tên / Nickname"} 
                 required 
                 className="w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 text-white outline-none transition-all placeholder:text-slate-600"
-                onChange={(e) => setFormData({...formData, name: e.target.value})} 
+                onChange={(e) => setFormData({...formData, fullName: e.target.value})} 
               />
             </div>
             
