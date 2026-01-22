@@ -13,7 +13,7 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   @MaxLength(500)
-  @Transform(({ value }) => value === '' ? null : value) // Biến "" thành null
+  @Transform(({ value }) => value === '' ? null : value)
   bio?: string;
 
   @ApiProperty({ required: false, example: 'https://res.cloudinary.com/...' })
@@ -26,6 +26,13 @@ export class UpdateProfileDto {
   @IsOptional()
   @Transform(({ value }) => value === '' ? null : value)
   phone?: string;
+
+  @ApiProperty({ required: false, example: '123 Đường ABC, Quận 1, TP.HCM' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  @Transform(({ value }) => value === '' ? null : value)
+  address?: string;
 
   @ApiProperty({ required: false, example: 'https://facebook.com/me' })
   @IsOptional()

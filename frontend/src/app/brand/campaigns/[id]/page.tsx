@@ -1,17 +1,26 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-// Sử dụng relative path
-import { useCampaignDetail, useApproveApplication, useRejectApplication } from '../../../../hooks/useCampaigns';
+import { 
+  useCampaignDetail, 
+  useApproveApplication, 
+  useRejectApplication, 
+  useUpdateCampaign, 
+  useDeleteCampaign 
+} from '../../../../hooks/useCampaigns';
 import DashboardLayout from '../../../../components/DashboardLayout';
 import AuthGuard from '../../../../components/AuthGuard';
 import { Button } from '../../../../components/ui/button';
 import { Badge } from '../../../../components/ui/badge';
 import BookingManager from '../../../../components/BookingManager';
-import { Loader2, ArrowLeft, Check, X, MessageSquare, User, Users, Calendar, DollarSign, Filter, MoreHorizontal } from 'lucide-react';
+import { 
+  Loader2, ArrowLeft, Check, X, MessageSquare, User, Users, Calendar, 
+  DollarSign, Filter, MoreHorizontal, ExternalLink, PauseCircle, Trash2 
+} from 'lucide-react';
 import { CampaignStatus } from '../../../../types';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '../../../../lib/utils';
+import { toast } from 'sonner';
 
 export default function BrandCampaignManagePage() {
   const params = useParams();
@@ -22,12 +31,52 @@ export default function BrandCampaignManagePage() {
   const { mutate: approve, isPending: isApproving } = useApproveApplication();
   const { mutate: reject, isPending: isRejecting } = useRejectApplication();
   
+  // Tech Debt #1 Hooks: Thêm hook xử lý
+  const { mutate: updateStatus } = useUpdateCampaign();
+  const { mutate: deleteCampaign } = useDeleteCampaign();
+
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL');
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: any) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   if (isLoading) return <DashboardLayout><div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div></DashboardLayout>;
   if (error || !campaign) return <DashboardLayout><div className="text-center mt-20">Không tìm thấy chiến dịch</div></DashboardLayout>;
 
-  // Lọc ứng viên
+  // Tech Debt #1: Xử lý sự kiện Stop/Delete
+  const handleStopCampaign = () => {
+      setShowMenu(false);
+      if (confirm('Bạn chắc chắn muốn ngừng tuyển dụng cho chiến dịch này?')) {
+          updateStatus({ id, data: { status: CampaignStatus.CLOSED } });
+      }
+  };
+
+  const handleDeleteCampaign = () => {
+      setShowMenu(false);
+      if (confirm('CẢNH BÁO: Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa?')) {
+          deleteCampaign(id);
+      }
+  };
+
+  // Tech Debt #3: Logic xem Profile Link
+  const handleViewProfile = (link: string | null) => {
+      if (!link) {
+          toast.error("KOL chưa cập nhật link kênh trong hồ sơ.");
+          return;
+      }
+      window.open(link, '_blank');
+  };
+
   const applications = campaign.applications || [];
   const filteredApps = applications.filter((app: any) => {
       if (filterStatus === 'ALL') return true;
@@ -50,7 +99,7 @@ export default function BrandCampaignManagePage() {
               <ArrowLeft className="mr-1 h-4 w-4 group-hover:-translate-x-1 transition-transform" /> Quay lại danh sách
             </button>
             
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative">
               <div>
                 <div className="flex items-center gap-3">
                   <h1 className="text-2xl font-bold text-slate-900">{campaign.title}</h1>
@@ -64,13 +113,40 @@ export default function BrandCampaignManagePage() {
                   <span className="flex items-center"><Users className="w-4 h-4 mr-1 text-slate-400"/> {applications.length} Ứng tuyển</span>
                 </div>
               </div>
-              <div className="flex gap-3">
+              
+              <div className="flex gap-2 relative">
                 <Button variant="outline" size="sm" onClick={() => router.push(`/campaigns/${id}`)}>
-                  Xem bài đăng Public
+                  Xem bài đăng
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => router.push(`/brand/campaigns/edit/${id}`)}>
-                  Chỉnh sửa
-                </Button> 
+                  Sửa
+                </Button>
+
+                {/* Tech Debt #1: Custom Menu (No external lib dependency) */}
+                <div className="relative" ref={menuRef}>
+                    <Button variant="ghost" size="icon" onClick={() => setShowMenu(!showMenu)}>
+                        <MoreHorizontal className="w-5 h-5"/>
+                    </Button>
+                    
+                    {showMenu && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                             {campaign.status === CampaignStatus.OPEN && (
+                                <button 
+                                    onClick={handleStopCampaign}
+                                    className="w-full text-left px-4 py-3 text-sm text-orange-600 hover:bg-orange-50 flex items-center transition-colors"
+                                >
+                                    <PauseCircle className="w-4 h-4 mr-2"/> Ngừng tuyển dụng
+                                </button>
+                             )}
+                             <button 
+                                onClick={handleDeleteCampaign}
+                                className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center transition-colors border-t border-slate-50"
+                             >
+                                <Trash2 className="w-4 h-4 mr-2"/> Xóa chiến dịch
+                             </button>
+                        </div>
+                    )}
+                </div>
               </div>
             </div>
           </div>
@@ -128,10 +204,22 @@ export default function BrandCampaignManagePage() {
                                         {app.status}
                                     </Badge>
                                 </div>
-                                <div className="text-sm text-slate-500 flex flex-wrap gap-x-4 gap-y-1">
-                                    <span>{app.kol.email}</span>
-                                    {app.kol.phone && <span>• {app.kol.phone}</span>}
-                                    <span className="text-indigo-600 font-medium cursor-pointer hover:underline">Xem hồ sơ chi tiết</span>
+                                <div className="text-sm text-slate-500 flex flex-wrap gap-x-4 gap-y-1 items-center">
+                                    {/* Tech Debt #4: Logic ẩn hiện thông tin liên hệ */}
+                                    {app.status === 'APPROVED' || app.status === 'COMPLETED' ? (
+                                        <>
+                                            <span className="font-medium text-slate-700">{app.kol.phone}</span>
+                                            <span className="text-slate-300">|</span>
+                                        </>
+                                    ) : null}
+                                    
+                                    {/* Tech Debt #3: Nút xem hồ sơ */}
+                                    <button 
+                                        onClick={() => handleViewProfile(app.kol.socialLink)}
+                                        className="flex items-center text-indigo-600 font-medium cursor-pointer hover:underline"
+                                    >
+                                        <ExternalLink className="w-3.5 h-3.5 mr-1"/> Xem kênh
+                                    </button>
                                 </div>
                                 <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm italic text-slate-600 relative">
                                     <span className="absolute -left-1 top-3 w-1 h-8 bg-indigo-200 rounded-r"></span>

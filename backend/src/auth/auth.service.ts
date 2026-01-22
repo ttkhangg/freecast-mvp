@@ -62,15 +62,20 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
     
+    // Clean data: Biến chuỗi rỗng thành null để DB sạch
     const cleanData = { ...dto };
-    if (cleanData.socialLink === '') cleanData.socialLink = null;
-    if (cleanData.bio === '') cleanData.bio = null;
-    if (cleanData.phone === '') cleanData.phone = null;
+    Object.keys(cleanData).forEach(key => {
+        if (cleanData[key] === '') cleanData[key] = null;
+    });
 
     return this.prisma.user.update({
       where: { id: userId },
       data: cleanData,
-      select: { id: true, email: true, fullName: true, avatar: true, bio: true, phone: true, socialLink: true, role: true, isEmailVerified: true }
+      select: { 
+          id: true, email: true, fullName: true, avatar: true, 
+          bio: true, phone: true, address: true, socialLink: true, 
+          role: true, isEmailVerified: true 
+      }
     });
   }
 
@@ -78,7 +83,9 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: {
-            id: true, email: true, fullName: true, avatar: true, bio: true, phone: true, socialLink: true, role: true, isEmailVerified: true, createdAt: true
+            id: true, email: true, fullName: true, avatar: true, 
+            bio: true, phone: true, address: true, socialLink: true, 
+            role: true, isEmailVerified: true, createdAt: true
         }
     });
     
