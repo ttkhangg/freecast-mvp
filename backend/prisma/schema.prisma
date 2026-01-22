@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")   // Dùng cho Migration (Prisma tự động dùng cái này khi migrate)
+ // directUrl = env("DIRECT_URL")   // Dùng cho Migration (Prisma tự động dùng cái này khi migrate)
 }
 
 enum Role {

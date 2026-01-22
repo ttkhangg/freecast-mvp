@@ -11,14 +11,15 @@ import { useUploadImage, useUpdateProfile } from '@/hooks/useProfile';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Camera, Save, User as UserIcon, Link as LinkIcon, Phone, FileText } from 'lucide-react';
+import { Camera, Save, User as UserIcon, Link as LinkIcon, Phone, FileText, MapPin } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 
-// Schema Validation
+// Schema Validation - Updated Address
 const profileSchema = z.object({
   fullName: z.string().min(2, 'Họ tên quá ngắn').max(50),
   bio: z.string().optional(),
   phone: z.string().optional(),
+  address: z.string().optional(), // Tech debt #2
   socialLink: z.union([z.string().url('Link không hợp lệ'), z.literal('')]).optional(),
 });
 
@@ -43,6 +44,7 @@ export default function ProfilePage() {
       fullName: user?.fullName || '',
       bio: user?.bio || '',
       phone: user?.phone || '',
+      address: user?.address || '',
       socialLink: user?.socialLink || '',
     },
   });
@@ -53,6 +55,7 @@ export default function ProfilePage() {
         fullName: user.fullName,
         bio: user.bio || '',
         phone: user.phone || '',
+        address: user.address || '',
         socialLink: user.socialLink || '',
       });
       setPreviewAvatar(user.avatar || null);
@@ -82,9 +85,11 @@ export default function ProfilePage() {
     const payload = {
       ...data,
       avatar: avatarUrl,
-      socialLink: data.socialLink === '' ? undefined : data.socialLink,
-      bio: data.bio === '' ? undefined : data.bio,
-      phone: data.phone === '' ? undefined : data.phone,
+      // Clean undefined/empty strings
+      socialLink: data.socialLink || undefined,
+      bio: data.bio || undefined,
+      phone: data.phone || undefined,
+      address: data.address || undefined,
     };
 
     updateProfile(payload);
@@ -97,7 +102,7 @@ export default function ProfilePage() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Hồ sơ cá nhân</h2>
             <p className="text-muted-foreground mt-1">
-              Quản lý thông tin hiển thị của bạn trên nền tảng FreeCast.
+              Quản lý thông tin hiển thị và liên lạc để tăng độ uy tín.
             </p>
           </div>
 
@@ -140,7 +145,6 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              {/* Status Card (Ví dụ) */}
               <Card className="bg-primary/5 border-primary/20">
                   <CardHeader className="pb-2">
                       <CardTitle className="text-base text-primary">Trạng thái tài khoản</CardTitle>
@@ -150,7 +154,6 @@ export default function ProfilePage() {
                           <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
                           <span className="font-medium">Đang hoạt động</span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">Tài khoản của bạn đã được xác minh email.</p>
                   </CardContent>
               </Card>
             </div>
@@ -160,11 +163,11 @@ export default function ProfilePage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Thông tin cơ bản</CardTitle>
-                  <CardDescription>Cập nhật tên, liên hệ và giới thiệu về bản thân.</CardDescription>
+                  <CardDescription>Các thông tin này sẽ được dùng cho hợp đồng booking.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="fullName">Họ và tên</Label>
+                    <Label htmlFor="fullName">Họ và tên / Tên Doanh nghiệp</Label>
                     <div className="relative">
                         <UserIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input id="fullName" className="pl-9" {...register('fullName')} />
@@ -172,12 +175,23 @@ export default function ProfilePage() {
                     {errors.fullName && <p className="text-xs text-destructive">{errors.fullName.message}</p>}
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="phone">Số điện thoại</Label>
-                    <div className="relative">
-                        <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input id="phone" className="pl-9" {...register('phone')} placeholder="0912..." />
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="phone">Số điện thoại</Label>
+                        <div className="relative">
+                            <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input id="phone" className="pl-9" {...register('phone')} placeholder="0912..." />
+                        </div>
+                      </div>
+                      
+                      {/* Tech Debt #2: Add Address */}
+                      <div className="grid gap-2">
+                        <Label htmlFor="address">Địa chỉ (Nhận hàng/Gửi hàng)</Label>
+                        <div className="relative">
+                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input id="address" className="pl-9" {...register('address')} placeholder="123 ABC..." />
+                        </div>
+                      </div>
                   </div>
 
                   <div className="grid gap-2">
@@ -199,18 +213,18 @@ export default function ProfilePage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Mạng xã hội</CardTitle>
-                  <CardDescription>Kết nối các nền tảng khác để tăng độ uy tín.</CardDescription>
+                  <CardDescription>Link kênh chính của bạn (TikTok/YouTube/Facebook).</CardDescription>
                 </CardHeader>
                 <CardContent>
                    <div className="grid gap-2">
-                    <Label htmlFor="socialLink">Link Facebook / TikTok / Website</Label>
+                    <Label htmlFor="socialLink">Link Channel</Label>
                     <div className="relative">
                         <LinkIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input 
                             id="socialLink" 
                             className="pl-9"
                             {...register('socialLink')} 
-                            placeholder="https://..."
+                            placeholder="https://tiktok.com/@username"
                         />
                     </div>
                     {errors.socialLink && <p className="text-xs text-destructive">{errors.socialLink.message}</p>}

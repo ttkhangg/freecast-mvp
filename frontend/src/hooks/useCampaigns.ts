@@ -12,9 +12,10 @@ export interface CreateCampaignDto {
   budget: number;
   deadline: string;
   status?: CampaignStatus;
+  images?: string[];
 }
 
-// ... (Giữ các hook cũ useCampaignDetail, useMyCampaigns...) ...
+// ... (Giữ các hook Query cũ useCampaignDetail, useMyCampaigns...) ...
 export const useCampaignDetail = (id: string) => {
   return useQuery<Campaign & { applications: any[] }>({
     queryKey: ['campaign', id],
@@ -30,15 +31,13 @@ export const useMyCampaigns = () => {
   });
 };
 
-// --- NEW HOOK: Lấy danh sách việc làm của KOL ---
 export const useMyJobs = () => {
-  return useQuery<any[]>({ // Trả về list Application
+  return useQuery<any[]>({
     queryKey: ['my-jobs'],
     queryFn: async () => await api.get('/campaigns/kol/my-jobs'),
   });
 };
 
-// ... (Giữ nguyên các hook mutation: create, update, apply, cancel...) ...
 export const useCreateCampaign = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -54,6 +53,7 @@ export const useCreateCampaign = () => {
   });
 };
 
+// TECH DEBT #1: Update Campaign
 export const useUpdateCampaign = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -63,20 +63,38 @@ export const useUpdateCampaign = () => {
       toast.success('Cập nhật thành công!');
       queryClient.invalidateQueries({ queryKey: ['campaign'] });
       queryClient.invalidateQueries({ queryKey: ['my-campaigns'] });
-      router.back();
+      // Không cần back() bắt buộc, để user tự quyết định hoặc stay
     },
     onError: (e: any) => toast.error(e.message || 'Lỗi'),
   });
 };
+
+// TECH DEBT #1: Delete Campaign
+export const useDeleteCampaign = () => {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  return useMutation({
+    mutationFn: async (id: string) => await api.delete(`/campaigns/${id}`),
+    onSuccess: () => {
+      toast.success('Đã xóa chiến dịch.');
+      queryClient.invalidateQueries({ queryKey: ['my-campaigns'] });
+      router.push('/brand/campaigns');
+    },
+    onError: (e: any) => toast.error(e.message || 'Không thể xóa (Có thể đã có ứng viên)'),
+  });
+};
+
+// TECH DEBT #1: Stop/Pause Campaign (Dùng chung update)
+// Chúng ta có thể tái sử dụng useUpdateCampaign, chỉ cần truyền data: { status: 'CLOSED' }
 
 export const useApplyCampaign = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (campaignId: string) => await api.post(`/campaigns/${campaignId}/apply`),
     onSuccess: () => {
-      toast.success('Ứng tuyển thành công!');
+      toast.success('Ứng tuyển thành công! Vui lòng chờ Brand duyệt.');
       queryClient.invalidateQueries({ queryKey: ['campaign'] });
-      queryClient.invalidateQueries({ queryKey: ['my-jobs'] }); // Cập nhật list việc làm
+      queryClient.invalidateQueries({ queryKey: ['my-jobs'] });
     },
     onError: (e: any) => toast.error(e.message || 'Lỗi'),
   });
@@ -89,7 +107,7 @@ export const useCancelApplication = () => {
     onSuccess: () => {
       toast.info('Đã hủy ứng tuyển.');
       queryClient.invalidateQueries({ queryKey: ['campaign'] });
-      queryClient.invalidateQueries({ queryKey: ['my-jobs'] }); // Cập nhật list việc làm
+      queryClient.invalidateQueries({ queryKey: ['my-jobs'] });
     },
     onError: (e: any) => toast.error(e.message || 'Lỗi'),
   });
